@@ -1,0 +1,513 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+}
+
+/* 全局样式 */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font-family-sans);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+  background: transparent;
+}
+
+/* 中文文本优化 - 基于WCAG 2.1标准 */
+.chinese-text {
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
+  line-height: 1.8;
+  letter-spacing: 0.05em;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  font-weight: 400;
+}
+
+/* 中文标题优化 - 对比度7:1 */
+.chinese-title {
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: #111827; /* 对比度 15.3:1 */
+}
+
+/* 中文内容文本优化 - 对比度4.5:1以上 */
+.chinese-content {
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
+  line-height: 2;
+  letter-spacing: 0.08em;
+  font-size: 16px;
+  color: #1f2937; /* 对比度 12.6:1 */
+  font-weight: 400;
+}
+
+/* 状态文本优化 - 对比度4.5:1以上 */
+.status-text {
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  font-size: 15px;
+  color: #374151; /* 对比度 9.7:1 */
+}
+
+/* 次要文本 - 对比度4.5:1 */
+.text-secondary {
+  color: #4b5563; /* 对比度 7.0:1 */
+}
+
+/* 提示文本 - 对比度4.5:1 */
+.text-muted {
+  color: #6b7280; /* 对比度 4.5:1 */
+}
+
+/* 强调文本 - 高对比度 */
+.text-emphasis {
+  color: #111827; /* 对比度 15.3:1 */
+  font-weight: 600;
+}
+
+/* 录音按钮动画 */
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.recording-pulse {
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+/* 波形动画 */
+@keyframes wave {
+  0%, 100% {
+    height: 0.5rem;
+  }
+  50% {
+    height: 1.5rem;
+  }
+}
+
+.wave-bar {
+  animation: wave 1s ease-in-out infinite;
+}
+
+.wave-bar:nth-child(1) { animation-delay: 0s; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; }
+
+/* 处理中动画 */
+@keyframes processing {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.processing-spin {
+  animation: processing 1s linear infinite;
+}
+
+/* 文本淡入动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 自定义滚动条 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* 深色模式下的滚动条 */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* 防止文本选择 */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 可拖拽区域 */
+.draggable {
+  -webkit-app-region: drag;
+}
+
+.non-draggable {
+  -webkit-app-region: no-drag;
+}
+
+/* 毛玻璃效果 */
+.glass-effect {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-effect {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 按钮悬停效果 */
+.btn-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-hover:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-md);
+}
+
+/* 中文标点符号优化 */
+.chinese-punctuation {
+  font-feature-settings: "halt" 1;
+}
+
+/* 响应式字体大小 */
+@media (max-width: 640px) {
+  .chinese-content {
+    font-size: 14px;
+    line-height: 1.8;
+    letter-spacing: 0.06em;
+  }
+  
+  .chinese-title {
+    font-size: 18px;
+    line-height: 1.3;
+  }
+  
+  .status-text {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  .chinese-content {
+    font-size: 15px;
+    line-height: 1.9;
+    letter-spacing: 0.07em;
+  }
+  
+  .chinese-title {
+    font-size: 20px;
+    line-height: 1.35;
+  }
+  
+  .status-text {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .chinese-content {
+    font-size: 17px;
+    line-height: 2.1;
+    letter-spacing: 0.08em;
+  }
+  
+  .chinese-title {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+  
+  .status-text {
+    font-size: 16px;
+  }
+}
+
+/* 深色模式下的文本颜色优化 - 基于WCAG标准 */
+.dark .chinese-content {
+  color: #f9fafb; /* 对比度 17.4:1 */
+}
+
+.dark .chinese-title {
+  color: #ffffff; /* 对比度 21:1 */
+}
+
+.dark .status-text {
+  color: #f3f4f6; /* 对比度 15.8:1 */
+}
+
+.dark .text-secondary {
+  color: #e5e7eb; /* 对比度 12.6:1 */
+}
+
+.dark .text-muted {
+  color: #d1d5db; /* 对比度 9.7:1 */
+}
+
+.dark .text-emphasis {
+  color: #ffffff; /* 对比度 21:1 */
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .chinese-content {
+    color: #000000;
+    font-weight: 500;
+  }
+  
+  .chinese-title {
+    color: #000000;
+    font-weight: 700;
+  }
+  
+  .status-text {
+    color: #000000;
+    font-weight: 600;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .dark .chinese-content {
+    color: #ffffff;
+    font-weight: 500;
+  }
+  
+  .dark .chinese-title {
+    color: #ffffff;
+    font-weight: 700;
+  }
+  
+  .dark .status-text {
+    color: #ffffff;
+    font-weight: 600;
+  }
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .recording-pulse,
+  .wave-bar,
+  .processing-spin {
+    animation: none;
+  }
+  
+  .btn-hover {
+    transition: none;
+  }
+}
+
+/* 文本区域滚动优化 */
+.text-area-scroll {
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.05);
+}
+
+.text-area-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.text-area-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.text-area-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.text-area-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* 深色模式下的文本区域滚动条 */
+.dark .text-area-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+}
+
+.dark .text-area-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .text-area-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark .text-area-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* 模型状态指示器动画 */
+@keyframes model-loading {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+.model-loading {
+  animation: model-loading 2s ease-in-out infinite;
+}
+
+/* 模型就绪状态的脉冲效果 */
+@keyframes model-ready-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.model-ready {
+  animation: model-ready-pulse 2s infinite;
+}
+
+/* 模型错误状态的闪烁效果 */
+@keyframes model-error-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  25%, 75% {
+    opacity: 0.5;
+  }
+}
+
+.model-error {
+  animation: model-error-blink 1.5s ease-in-out infinite;
+}
+
+/* 模型状态工具提示增强 */
+.model-status-tooltip {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
