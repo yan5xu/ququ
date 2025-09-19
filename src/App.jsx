@@ -168,7 +168,6 @@ export default function App() {
   const [processedText, setProcessedText] = useState("");
   const [showTextArea, setShowTextArea] = useState(false);
   
-  const { hotkey } = useHotkey();
   const { isDragging, handleMouseDown, handleMouseMove, handleMouseUp, handleClick } = useWindowDrag();
   const modelStatus = useModelStatus();
   
@@ -269,7 +268,7 @@ export default function App() {
   };
 
   // 切换录音状态
-  const toggleRecording = () => {
+  const toggleRecording = useCallback(() => {
     // 检查FunASR是否就绪
     if (!modelStatus.isReady) {
       if (modelStatus.isLoading) {
@@ -287,7 +286,33 @@ export default function App() {
     } else if (isRecording) {
       stopRecording();
     }
-  };
+  }, [modelStatus.isReady, modelStatus.isLoading, modelStatus.error, isRecording, isRecordingProcessing, startRecording, stopRecording]);
+
+  // 处理F2双击事件
+  const handleF2DoubleClick = useCallback((data) => {
+    console.log('收到F2双击事件:', data, '当前UI录音状态:', isRecording);
+    
+    // 简化逻辑：F2双击就是切换录音状态
+    if (data.action === 'start' && !isRecording && !isRecordingProcessing) {
+      console.log('F2双击 - 开始录音');
+      toast.info("🎤 F2双击 - 开始录音");
+      toggleRecording();
+    } else if (data.action === 'stop' && isRecording) {
+      console.log('F2双击 - 停止录音');
+      toast.info("⏹️ F2双击 - 停止录音");
+      toggleRecording();
+    } else {
+      console.log('F2双击被忽略，状态不匹配:', {
+        action: data.action,
+        currentState: data.currentState,
+        uiIsRecording: isRecording,
+        isProcessing: isRecordingProcessing
+      });
+    }
+  }, [isRecording, isRecordingProcessing, toggleRecording]);
+
+  // 使用热键Hook，传入F2双击处理函数
+  const { hotkey, isF2Registered, syncRecordingState } = useHotkey(handleF2DoubleClick);
 
   // 处理关闭窗口
   const handleClose = () => {
@@ -318,7 +343,14 @@ export default function App() {
       });
       return unsubscribe;
     }
-  }, [isRecording, isRecordingProcessing]);
+  }, [toggleRecording]);
+
+  // 同步录音状态到热键管理器
+  useEffect(() => {
+    if (syncRecordingState) {
+      syncRecordingState(isRecording);
+    }
+  }, [isRecording, syncRecordingState]);
 
   // 监听键盘事件
   useEffect(() => {
@@ -497,7 +529,7 @@ export default function App() {
             ) : micState === "optimizing" ? (
               "AI正在优化文本，请稍候..."
             ) : (
-              `点击麦克风或按 ${hotkey} 开始录音`
+              `点击麦克风、按 ${hotkey} 或双击F2开始录音`
             )}
           </p>
         </div>

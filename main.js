@@ -22,6 +22,7 @@ const DatabaseManager = require("./src/helpers/database");
 const ClipboardManager = require("./src/helpers/clipboard");
 const FunASRManager = require("./src/helpers/funasrManager");
 const TrayManager = require("./src/helpers/tray");
+const HotkeyManager = require("./src/helpers/hotkeyManager");
 const IPCHandlers = require("./src/helpers/ipcHandlers");
 
 // 设置生产环境PATH
@@ -58,6 +59,7 @@ const databaseManager = new DatabaseManager();
 const clipboardManager = new ClipboardManager();
 const funasrManager = new FunASRManager();
 const trayManager = new TrayManager();
+const hotkeyManager = new HotkeyManager();
 
 // 初始化数据库
 const dataDirectory = environmentManager.ensureDataDirectory();
@@ -70,6 +72,7 @@ const ipcHandlers = new IPCHandlers({
   clipboardManager,
   funasrManager,
   windowManager,
+  hotkeyManager,
 });
 
 // 主应用启动函数
@@ -142,5 +145,6 @@ module.exports = {
   databaseManager,
   clipboardManager,
   funasrManager,
-  trayManager
+  trayManager,
+  hotkeyManager
 };

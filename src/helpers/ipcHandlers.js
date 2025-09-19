@@ -8,6 +8,10 @@ class IPCHandlers {
     this.clipboardManager = managers.clipboardManager;
     this.funasrManager = managers.funasrManager;
     this.windowManager = managers.windowManager;
+    this.hotkeyManager = managers.hotkeyManager;
+    
+    // 跟踪F2热键注册状态
+    this.f2RegisteredSenders = new Set();
     
     this.setupHandlers();
   }
@@ -227,18 +231,139 @@ class IPCHandlers {
 
     // 热键管理
     ipcMain.handle("register-hotkey", (event, hotkey) => {
-      // TODO: 实现热键注册功能
-      return { success: true };
+      try {
+        if (this.hotkeyManager) {
+          const success = this.hotkeyManager.registerHotkey(hotkey, () => {
+            // 发送热键触发事件到渲染进程
+            event.sender.send("hotkey-triggered", { hotkey });
+          });
+          return { success };
+        }
+        return { success: false, error: "热键管理器未初始化" };
+      } catch (error) {
+        console.error("注册热键失败:", error);
+        return { success: false, error: error.message };
+      }
     });
 
-    ipcMain.handle("unregister-hotkey", () => {
-      // TODO: 实现热键注销功能
-      return { success: true };
+    ipcMain.handle("unregister-hotkey", (event, hotkey) => {
+      try {
+        if (this.hotkeyManager) {
+          const success = this.hotkeyManager.unregisterHotkey(hotkey);
+          return { success };
+        }
+        return { success: false, error: "热键管理器未初始化" };
+      } catch (error) {
+        console.error("注销热键失败:", error);
+        return { success: false, error: error.message };
+      }
     });
 
     ipcMain.handle("get-current-hotkey", () => {
-      // TODO: 实现获取当前热键功能
-      return "CommandOrControl+Shift+Space";
+      try {
+        if (this.hotkeyManager) {
+          const hotkeys = this.hotkeyManager.getRegisteredHotkeys();
+          // 返回第一个非F2的热键，或默认热键
+          const mainHotkey = hotkeys.find(key => key !== 'F2') || "CommandOrControl+Shift+Space";
+          return mainHotkey;
+        }
+        return "CommandOrControl+Shift+Space";
+      } catch (error) {
+        console.error("获取当前热键失败:", error);
+        return "CommandOrControl+Shift+Space";
+      }
+    });
+
+    // F2热键管理
+    ipcMain.handle("register-f2-hotkey", (event) => {
+      try {
+        const senderId = event.sender.id;
+        
+        // 检查是否已经为这个发送者注册过F2热键
+        if (this.f2RegisteredSenders.has(senderId)) {
+          console.log(`F2热键已为发送者 ${senderId} 注册过，跳过重复注册`);
+          return { success: true };
+        }
+        
+        if (this.hotkeyManager) {
+          const success = this.hotkeyManager.registerF2DoubleClick((data) => {
+            // 发送F2双击事件到所有注册的渲染进程
+            console.log("发送F2双击事件到渲染进程:", data);
+            this.f2RegisteredSenders.forEach(id => {
+              const window = require("electron").BrowserWindow.getAllWindows().find(w => w.webContents.id === id);
+              if (window && !window.isDestroyed()) {
+                window.webContents.send("f2-double-click", data);
+              }
+            });
+          });
+          
+          if (success) {
+            this.f2RegisteredSenders.add(senderId);
+            
+            // 监听窗口关闭事件，清理注册记录
+            event.sender.on('destroyed', () => {
+              this.f2RegisteredSenders.delete(senderId);
+              console.log(`清理发送者 ${senderId} 的F2热键注册记录`);
+            });
+          }
+          
+          return { success };
+        }
+        return { success: false, error: "热键管理器未初始化" };
+      } catch (error) {
+        console.error("注册F2热键失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("unregister-f2-hotkey", (event) => {
+      try {
+        const senderId = event.sender.id;
+        
+        if (this.hotkeyManager && this.f2RegisteredSenders.has(senderId)) {
+          this.f2RegisteredSenders.delete(senderId);
+          
+          // 如果没有其他发送者注册F2热键，则注销热键
+          if (this.f2RegisteredSenders.size === 0) {
+            const success = this.hotkeyManager.unregisterHotkey('F2');
+            console.log('所有发送者都已注销，注销F2热键');
+            return { success };
+          } else {
+            console.log(`发送者 ${senderId} 已注销，但还有其他发送者注册了F2热键`);
+            return { success: true };
+          }
+        }
+        return { success: false, error: "热键管理器未初始化或未注册" };
+      } catch (error) {
+        console.error("注销F2热键失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("set-recording-state", (event, isRecording) => {
+      try {
+        if (this.hotkeyManager) {
+          this.hotkeyManager.setRecordingState(isRecording);
+          return { success: true };
+        }
+        return { success: false, error: "热键管理器未初始化" };
+      } catch (error) {
+        console.error("设置录音状态失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("get-recording-state", () => {
+      try {
+        if (this.hotkeyManager) {
+          const isRecording = this.hotkeyManager.getRecordingState();
+          return { success: true, isRecording };
+        }
+        return { success: false, error: "热键管理器未初始化" };
+      } catch (error) {
+        console.error("获取录音状态失败:", error);
+        return { success: false, error: error.message };
+      }
     });
 
     // 文件操作
