@@ -288,28 +288,21 @@ export default function App() {
     }
   }, [modelStatus.isReady, modelStatus.isLoading, modelStatus.error, isRecording, isRecordingProcessing, startRecording, stopRecording]);
 
-  // 处理F2双击事件
+  // 处理F2双击事件 - 使用useRef避免依赖变化
   const handleF2DoubleClick = useCallback((data) => {
-    console.log('收到F2双击事件:', data, '当前UI录音状态:', isRecording);
+    console.log('收到F2双击事件:', data);
     
-    // 简化逻辑：F2双击就是切换录音状态
-    if (data.action === 'start' && !isRecording && !isRecordingProcessing) {
-      console.log('F2双击 - 开始录音');
+    // 直接调用toggleRecording，让它处理状态检查
+    if (data.action === 'start') {
+      console.log('F2双击 - 尝试开始录音');
       toast.info("🎤 F2双击 - 开始录音");
       toggleRecording();
-    } else if (data.action === 'stop' && isRecording) {
-      console.log('F2双击 - 停止录音');
+    } else if (data.action === 'stop') {
+      console.log('F2双击 - 尝试停止录音');
       toast.info("⏹️ F2双击 - 停止录音");
       toggleRecording();
-    } else {
-      console.log('F2双击被忽略，状态不匹配:', {
-        action: data.action,
-        currentState: data.currentState,
-        uiIsRecording: isRecording,
-        isProcessing: isRecordingProcessing
-      });
     }
-  }, [isRecording, isRecordingProcessing, toggleRecording]);
+  }, [toggleRecording]);
 
   // 使用热键Hook，传入F2双击处理函数
   const { hotkey, isF2Registered, syncRecordingState } = useHotkey(handleF2DoubleClick);
