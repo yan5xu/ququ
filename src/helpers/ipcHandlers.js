@@ -1,5 +1,4 @@
 const { ipcMain } = require("electron");
-const axios = require("axios");
 
 class IPCHandlers {
   constructor(managers) {
@@ -144,20 +143,51 @@ class IPCHandlers {
     });
 
     // 剪贴板相关
-    ipcMain.handle("copy-text", (event, text) => {
-      return this.clipboardManager.copyText(text);
+    ipcMain.handle("copy-text", async (event, text) => {
+      try {
+        return await this.clipboardManager.copyText(text);
+      } catch (error) {
+        console.error("复制文本失败:", error);
+        return { success: false, error: error.message };
+      }
     });
 
-    ipcMain.handle("paste-text", () => {
-      return this.clipboardManager.pasteText();
+    ipcMain.handle("paste-text", async (event, text) => {
+      try {
+        await this.clipboardManager.pasteText(text);
+        return { success: true };
+      } catch (error) {
+        console.error("粘贴文本失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("read-clipboard", async () => {
+      try {
+        const text = await this.clipboardManager.readClipboard();
+        return { success: true, text };
+      } catch (error) {
+        console.error("读取剪贴板失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("write-clipboard", async (event, text) => {
+      try {
+        return await this.clipboardManager.writeClipboard(text);
+      } catch (error) {
+        console.error("写入剪贴板失败:", error);
+        return { success: false, error: error.message };
+      }
     });
 
     ipcMain.handle("get-clipboard-history", () => {
-      return this.clipboardManager.getHistory();
+      // TODO: 实现剪贴板历史功能
+      return [];
     });
 
     ipcMain.handle("clear-clipboard-history", () => {
-      this.clipboardManager.clearHistory();
+      // TODO: 实现清除剪贴板历史功能
       return true;
     });
 
@@ -615,25 +645,39 @@ ${text}
         requestData
       });
 
-      const response = await axios.post(`${baseUrl}/chat/completions`, requestData, {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000 // 30秒超时
+        body: JSON.stringify(requestData)
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData = { error: response.statusText };
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || response.statusText };
+        }
+        throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
+      }
+
+      const data = await response.json();
 
       console.log('AI文本处理响应:', {
         status: response.status,
-        data: response.data,
-        usage: response.data.usage
+        data: data,
+        usage: data.usage
       });
 
-      if (response.data.choices && response.data.choices.length > 0) {
+      if (data.choices && data.choices.length > 0) {
         const result = {
           success: true,
-          text: response.data.choices[0].message.content.trim(),
-          usage: response.data.usage,
+          text: data.choices[0].message.content.trim(),
+          usage: data.usage,
           model: model
         };
         
@@ -696,22 +740,36 @@ ${text}
       const model = process.env.AI_MODEL || await this.databaseManager.getSetting('ai_model') || 'gpt-3.5-turbo';
       
       // 发送一个简单的测试请求
-      const response = await axios.post(`${baseUrl}/chat/completions`, {
-        model: model,
-        messages: [
-          {
-            role: 'user',
-            content: '测试'
-          }
-        ],
-        max_tokens: 10
-      }, {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'user',
+              content: '测试'
+            }
+          ],
+          max_tokens: 10
+        })
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData = { error: response.statusText };
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || response.statusText };
+        }
+        throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
+      }
+
+      const data = await response.json();
 
       return {
         available: true,

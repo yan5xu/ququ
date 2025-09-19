@@ -95,7 +95,7 @@ const Tooltip = ({ children, content }) => {
 };
 
 // 文本显示区域组件
-const TextDisplay = ({ originalText, processedText, isProcessing, onCopy, onExport }) => {
+const TextDisplay = ({ originalText, processedText, isProcessing, onCopy, onExport, onPaste }) => {
   if (!originalText && !processedText) {
     return null; // 当没有文本时不显示任何内容，避免重复
   }
@@ -128,6 +128,15 @@ const TextDisplay = ({ originalText, processedText, isProcessing, onCopy, onExpo
             <div className="flex space-x-2">
               {processedText && (
                 <>
+                  <button
+                    onClick={() => onPaste(processedText)}
+                    className="p-2 hover:bg-emerald-200/70 dark:hover:bg-emerald-700/30 rounded-lg transition-colors shadow-sm"
+                    title="粘贴优化文本"
+                  >
+                    <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </button>
                   <button
                     onClick={() => onCopy(processedText)}
                     className="p-2 hover:bg-emerald-200/70 dark:hover:bg-emerald-700/30 rounded-lg transition-colors shadow-sm"
@@ -186,6 +195,28 @@ export default function App() {
     error: textProcessingError
   } = useTextProcessing();
 
+  // 安全粘贴函数
+  const safePaste = useCallback(async (text) => {
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.pasteText(text);
+        if (result.success) {
+          toast.success("文本已自动粘贴到当前输入框");
+        } else {
+          // 粘贴失败，但文本已复制到剪贴板
+          toast.warning(`自动粘贴失败，文本已复制到剪贴板。${result.error || ""}`);
+        }
+      } else {
+        // Web环境下只能复制到剪贴板
+        await navigator.clipboard.writeText(text);
+        toast.info("文本已复制到剪贴板，请手动粘贴");
+      }
+    } catch (error) {
+      console.error("粘贴文本失败:", error);
+      toast.error(`粘贴失败: ${error.message}`);
+    }
+  }, []);
+
   // 处理录音完成（FunASR识别完成）
   const handleRecordingComplete = useCallback(async (transcriptionResult) => {
     if (transcriptionResult.success && transcriptionResult.text) {
@@ -196,9 +227,27 @@ export default function App() {
       // 清空之前的处理结果，等待AI优化
       setProcessedText("");
 
+      // 立即粘贴FunASR识别结果 - 不等待AI优化
+      const pastePromise = safePaste(transcriptionResult.text);
+      
+      // 并行保存到数据库
+      const savePromise = window.electronAPI?.saveTranscription({
+        text: transcriptionResult.text,
+        raw_text: transcriptionResult.raw_text || transcriptionResult.text,
+        funasr_text: transcriptionResult.text,
+        original_text: transcriptionResult.raw_text || transcriptionResult.text,
+        confidence: transcriptionResult.confidence || 0,
+        language: transcriptionResult.language || 'zh-CN',
+        duration: transcriptionResult.duration || 0,
+        enhanced_by_ai: false
+      }).catch(err => console.warn("保存转录记录失败:", err));
+
+      // 等待粘贴完成
+      await pastePromise;
+
       toast.success("🎤 语音识别完成，AI正在优化文本...");
     }
-  }, []);
+  }, [safePaste]);
 
   // 处理AI优化完成
   const handleAIOptimizationComplete = useCallback(async (optimizedResult) => {
@@ -206,6 +255,10 @@ export default function App() {
     if (optimizedResult.success && optimizedResult.enhanced_by_ai && optimizedResult.text) {
       // 显示AI优化后的文本
       setProcessedText(optimizedResult.text);
+      
+      // 可选：如果AI优化后的文本与原文差异较大，可以再次粘贴优化后的文本
+      // 这里我们选择不自动粘贴，让用户手动选择是否使用优化后的文本
+      
       toast.success("🤖 AI文本优化完成！");
       console.log('AI优化文本已设置:', optimizedResult.text);
     } else {
@@ -236,15 +289,22 @@ export default function App() {
   const handleCopyText = async (text) => {
     try {
       if (window.electronAPI) {
-        await window.electronAPI.copyText(text);
+        const result = await window.electronAPI.copyText(text);
+        if (result.success) {
+          toast.success("文本已复制到剪贴板");
+        } else {
+          throw new Error(result.error || "复制失败");
+        }
       } else {
         await navigator.clipboard.writeText(text);
+        toast.success("文本已复制到剪贴板");
       }
-      toast.success("文本已复制到剪贴板");
     } catch (error) {
-      toast.error("无法复制文本到剪贴板");
+      console.error("复制文本失败:", error);
+      toast.error(`无法复制文本到剪贴板: ${error.message}`);
     }
   };
+
 
   // 处理导出文本
   const handleExportText = async (text) => {
@@ -535,6 +595,7 @@ export default function App() {
             isProcessing={isTextProcessing || isOptimizing}
             onCopy={handleCopyText}
             onExport={handleExportText}
+            onPaste={safePaste}
           />
         </div>
       </div>

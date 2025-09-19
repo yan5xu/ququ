@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // 剪贴板操作
   pasteText: (text) => ipcRenderer.invoke("paste-text", text),
   copyText: (text) => ipcRenderer.invoke("copy-text", text),
+  readClipboard: () => ipcRenderer.invoke("read-clipboard"),
+  writeClipboard: (text) => ipcRenderer.invoke("write-clipboard", text),
 
   // 数据库操作
   saveTranscription: (text, processedText) => 
