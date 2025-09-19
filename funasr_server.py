@@ -66,9 +66,13 @@ class FunASRServer:
             )
             logger.info("VAD模型初始化完成")
             
-            # 标点恢复现在由AI模型处理，不再使用FunASR的标点模型
-            self.punc_model = None
-            logger.info("跳过标点恢复模型初始化，将使用AI进行文本优化")
+            # 初始化标点恢复模型 - 使用FunASR自带的标点恢复功能
+            self.punc_model = AutoModel(
+                model="damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+                model_revision="v2.0.4",
+                disable_update=True
+            )
+            logger.info("标点恢复模型初始化完成")
             
             self.initialized = True
             return {"success": True, "message": "FunASR模型初始化成功"}
@@ -103,7 +107,7 @@ class FunASRServer:
                 "batch_size_s": 300,
                 "hotword": "",
                 "use_vad": True,
-                "use_punc": False,  # 不再使用FunASR的标点恢复
+                "use_punc": True,  # 使用FunASR自带的标点恢复
                 "language": "zh"
             }
             
@@ -136,9 +140,19 @@ class FunASRServer:
             
             logger.info(f"ASR识别完成，原始文本: {raw_text[:100]}...")
             
-            # 标点恢复和文本优化现在由AI模型处理
+            # 使用FunASR进行标点恢复
             final_text = raw_text
-            logger.info("跳过FunASR标点恢复，原始文本将由AI进行优化")
+            if default_options["use_punc"] and self.punc_model and raw_text.strip():
+                try:
+                    punc_result = self.punc_model.generate(input=raw_text)
+                    if isinstance(punc_result, list) and len(punc_result) > 0:
+                        if isinstance(punc_result[0], dict) and "text" in punc_result[0]:
+                            final_text = punc_result[0]["text"]
+                        else:
+                            final_text = str(punc_result[0])
+                    logger.info("FunASR标点恢复完成")
+                except Exception as e:
+                    logger.warning(f"FunASR标点恢复失败，使用原始文本: {str(e)}")
             
             result = {
                 "success": True,
@@ -179,7 +193,7 @@ class FunASRServer:
                 "models": {
                     "asr": self.asr_model is not None,
                     "vad": self.vad_model is not None,
-                    "punc": False  # 标点恢复由AI处理
+                    "punc": self.punc_model is not None  # FunASR标点恢复模型状态
                 }
             }
         except ImportError:

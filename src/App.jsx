@@ -186,18 +186,31 @@ export default function App() {
 
   // 处理AI优化完成
   const handleAIOptimizationComplete = useCallback(async (optimizedResult) => {
-    if (optimizedResult.success && optimizedResult.enhanced_by_ai) {
+    console.log('AI优化完成回调被触发:', optimizedResult);
+    if (optimizedResult.success && optimizedResult.enhanced_by_ai && optimizedResult.text) {
       // 显示AI优化后的文本
       setProcessedText(optimizedResult.text);
       toast.success("🤖 AI文本优化完成！");
+      console.log('AI优化文本已设置:', optimizedResult.text);
+    } else {
+      console.warn('AI优化结果无效:', optimizedResult);
     }
   }, []);
 
   // 设置转录完成回调
   useEffect(() => {
+    console.log('设置回调函数');
     window.onTranscriptionComplete = handleRecordingComplete;
     window.onAIOptimizationComplete = handleAIOptimizationComplete;
+    
+    // 验证回调函数是否正确设置
+    console.log('回调函数设置完成:', {
+      onTranscriptionComplete: typeof window.onTranscriptionComplete,
+      onAIOptimizationComplete: typeof window.onAIOptimizationComplete
+    });
+    
     return () => {
+      console.log('清理回调函数');
       window.onTranscriptionComplete = null;
       window.onAIOptimizationComplete = null;
     };

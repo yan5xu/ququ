@@ -123,10 +123,10 @@ export const useRecording = () => {
         const result = await window.electronAPI.transcribeAudio(uint8Array);
         
         if (result.success) {
-          // 立即显示FunASR识别结果
+          // 立即显示FunASR识别结果（已包含标点恢复）
           const initialResult = {
             ...result,
-            original_text: result.text,
+            original_text: result.raw_text || result.text, // 保存无标点的原始文本
             enhanced_by_ai: false
           };
           
@@ -134,28 +134,34 @@ export const useRecording = () => {
             window.onTranscriptionComplete(initialResult);
           }
           
-          // 异步进行AI优化，不阻塞界面显示
+          // 异步进行AI内容优化，不阻塞界面显示
           setIsOptimizing(true);
           
           // 使用setTimeout确保界面先更新
           setTimeout(async () => {
             try {
-              // 调用AI进行ASR结果优化
-              const enhanced = await processText(result.text, 'asr_enhance');
-              if (enhanced && enhanced !== result.text) {
-                // AI优化完成，更新界面
+              console.log('开始AI优化，原始文本:', result.text);
+              // 调用AI进行内容优化（不包括标点恢复）
+              const enhanced = await processText(result.text, 'optimize');
+              console.log('AI优化结果:', enhanced);
+              
+              if (enhanced) {
+                // AI优化完成，更新界面（即使结果与原文相同也显示）
                 const enhancedResult = {
                   ...result,
                   text: enhanced,
-                  original_text: result.text,
+                  original_text: result.raw_text || result.text,
                   enhanced_by_ai: true
                 };
                 
-                // 保存转录结果（包含原始文本和优化后的文本）
+                console.log('准备触发AI优化完成事件:', enhancedResult);
+                
+                // 保存转录结果（包含原始文本、FunASR标点恢复文本和AI优化后的文本）
                 const transcriptionData = {
                   text: enhanced,
                   raw_text: result.raw_text || result.text,
-                  original_text: result.text,
+                  funasr_text: result.text, // FunASR处理后的文本（含标点）
+                  original_text: result.raw_text || result.text,
                   confidence: result.confidence || 0,
                   language: result.language || 'zh-CN',
                   duration: result.duration || 0,
@@ -167,17 +173,23 @@ export const useRecording = () => {
                 
                 // 触发AI优化完成事件
                 if (window.onAIOptimizationComplete) {
+                  console.log('触发AI优化完成事件');
                   window.onAIOptimizationComplete(enhancedResult);
+                } else {
+                  console.error('window.onAIOptimizationComplete 回调函数不存在');
                 }
+              } else {
+                console.log('AI优化结果为空，不更新界面');
               }
             } catch (optimizeError) {
-              console.warn('AI优化失败，保持原始文本:', optimizeError);
+              console.warn('AI内容优化失败，保持FunASR处理结果:', optimizeError);
               
-              // 保存原始转录结果
+              // 保存FunASR处理结果
               const transcriptionData = {
                 text: result.text,
                 raw_text: result.raw_text || result.text,
-                original_text: result.text,
+                funasr_text: result.text,
+                original_text: result.raw_text || result.text,
                 confidence: result.confidence || 0,
                 language: result.language || 'zh-CN',
                 duration: result.duration || 0,
