@@ -108,7 +108,7 @@ chinese-whispr/
 ├── package.json              # 项目配置和依赖
 ├── main.js                   # Electron主进程
 ├── preload.js                # 安全的API桥接
-├── funasr_bridge.py          # FunASR Python桥接脚本
+├── funasr_server.py          # FunASR Python服务器脚本
 ├── tailwind.config.js        # Tailwind CSS配置
 ├── jsconfig.json             # JavaScript配置
 ├── components.json           # shadcn/ui配置

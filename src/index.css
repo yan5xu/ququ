@@ -511,3 +511,64 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
+
+/* FunASR准备状态动画 */
+@keyframes preparing-wave {
+  0%, 100% {
+    transform: scaleY(0.3);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* FunASR加载状态动画 */
+@keyframes loading-dots {
+  0%, 20% {
+    transform: scaleY(0.4);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  60%, 100% {
+    transform: scaleY(0.4);
+    opacity: 0.5;
+  }
+}
+
+/* FunASR错误状态动画 */
+@keyframes error-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+/* 减少动画偏好支持 - 为新动画添加支持 */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .recording-pulse,
+  .wave-bar,
+  .processing-spin {
+    animation: none;
+  }
+  
+  /* 为新的FunASR状态动画添加减少动画支持 */
+  *[style*="preparing-wave"],
+  *[style*="loading-dots"],
+  *[style*="error-pulse"] {
+    animation: none !important;
+  }
+  
+  .btn-hover {
+    transition: none;
+  }
+}

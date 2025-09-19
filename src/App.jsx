@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./index.css";
 import { toast } from "sonner";
 import { LoadingDots } from "./components/ui/loading-dots";
-import { StatusLight } from "./components/ui/status-light";
 import { useHotkey } from "./hooks/useHotkey";
 import { useWindowDrag } from "./hooks/useWindowDrag";
 import { useRecording } from "./hooks/useRecording";
@@ -31,6 +30,25 @@ const SoundWaveIcon = ({ size = 16, isActive = false }) => {
   );
 };
 
+// 加载指示器组件（FunASR启动中）
+const LoadingIndicator = ({ size = 20 }) => {
+  return (
+    <div className="flex items-center justify-center gap-0.5">
+      {[...Array(3)].map((_, i) => (
+        <div
+          key={i}
+          className="w-1 bg-gray-500 rounded-full"
+          style={{
+            height: size * 0.6,
+            animation: `loading-dots 1.4s ease-in-out infinite`,
+            animationDelay: `${i * 0.2}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
 // 语音波形指示器组件（处理状态）
 const VoiceWaveIndicator = ({ isListening }) => {
   return (
@@ -52,7 +70,7 @@ const VoiceWaveIndicator = ({ isListening }) => {
 };
 
 // 增强的工具提示组件
-const Tooltip = ({ children, content, emoji }) => {
+const Tooltip = ({ children, content }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   return (
@@ -68,7 +86,6 @@ const Tooltip = ({ children, content, emoji }) => {
           className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-white bg-gradient-to-r from-neutral-800 to-neutral-700 rounded-md whitespace-nowrap z-10 transition-opacity duration-150"
           style={{ fontSize: "10px" }}
         >
-          {emoji && <span className="mr-1">{emoji}</span>}
           {content}
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-neutral-800"></div>
         </div>
@@ -107,7 +124,7 @@ const TextDisplay = ({ originalText, processedText, isProcessing, onCopy, onExpo
       {(processedText || isProcessing) && (
         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-xl p-5 border-l-4 border-emerald-400 dark:border-emerald-500 shadow-lg border border-emerald-200/50 dark:border-emerald-700/50">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold chinese-title text-emerald-700 dark:text-emerald-400">🤖 AI优化后</h3>
+            <h3 className="text-base font-semibold chinese-title text-emerald-700 dark:text-emerald-400">AI优化后</h3>
             <div className="flex space-x-2">
               {processedText && (
                 <>
@@ -253,6 +270,18 @@ export default function App() {
 
   // 切换录音状态
   const toggleRecording = () => {
+    // 检查FunASR是否就绪
+    if (!modelStatus.isReady) {
+      if (modelStatus.isLoading) {
+        toast.warning("🤖 FunASR服务器正在启动中，请稍候...");
+      } else if (modelStatus.error) {
+        toast.error("❌ FunASR服务器未就绪，请检查配置");
+      } else {
+        toast.warning("⏳ 正在准备FunASR服务器，请稍候...");
+      }
+      return;
+    }
+
     if (!isRecording && !isRecordingProcessing) {
       startRecording();
     } else if (isRecording) {
@@ -331,38 +360,56 @@ export default function App() {
   // 获取麦克风按钮属性
   const getMicButtonProps = () => {
     const baseClasses =
-      "rounded-full w-16 h-16 flex items-center justify-center relative overflow-hidden border-2 border-white/80 cursor-pointer transition-all duration-300 shadow-xl";
+      "rounded-full w-16 h-16 flex items-center justify-center relative overflow-hidden border-2 border-white/80 transition-all duration-300 shadow-xl";
+
+    // 统一的按钮样式，不再根据状态变色
+    const buttonStyle = `${baseClasses} bg-gradient-to-br from-slate-100 to-slate-200 dark:from-gray-700 dark:to-gray-600 hover:from-slate-200 hover:to-slate-300 dark:hover:from-gray-600 dark:hover:to-gray-500 hover:shadow-2xl transform hover:scale-105`;
+
+    // 如果FunASR未就绪，显示禁用状态
+    if (!modelStatus.isReady) {
+      return {
+        className: `${baseClasses} bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 cursor-not-allowed opacity-70`,
+        tooltip: "FunASR服务器启动中，请稍候...",
+        disabled: true
+      };
+    }
 
     switch (micState) {
       case "idle":
         return {
-          className: `${baseClasses} bg-gradient-to-br from-slate-100 to-slate-200 dark:from-gray-700 dark:to-gray-600 hover:from-slate-200 hover:to-slate-300 dark:hover:from-gray-600 dark:hover:to-gray-500 hover:shadow-2xl transform hover:scale-105`,
+          className: `${buttonStyle} cursor-pointer`,
           tooltip: `按 [${hotkey}] 开始录音`,
+          disabled: false
         };
       case "hover":
         return {
-          className: `${baseClasses} bg-gradient-to-br from-slate-200 to-slate-300 dark:from-gray-600 dark:to-gray-500 scale-110 shadow-2xl`,
+          className: `${buttonStyle} scale-105 shadow-2xl cursor-pointer`,
           tooltip: `按 [${hotkey}] 开始录音`,
+          disabled: false
         };
       case "recording":
         return {
-          className: `${baseClasses} bg-gradient-to-br from-red-400 to-red-500 recording-pulse shadow-2xl`,
+          className: `${buttonStyle} recording-pulse cursor-pointer`,
           tooltip: "正在录音...",
+          disabled: false
         };
       case "processing":
         return {
-          className: `${baseClasses} bg-gradient-to-br from-blue-400 to-blue-500 cursor-not-allowed shadow-2xl`,
+          className: `${buttonStyle} cursor-not-allowed opacity-70`,
           tooltip: "正在识别语音...",
+          disabled: true
         };
       case "optimizing":
         return {
-          className: `${baseClasses} bg-gradient-to-br from-emerald-400 to-emerald-500 cursor-not-allowed shadow-2xl`,
+          className: `${buttonStyle} cursor-not-allowed opacity-70`,
           tooltip: "AI正在优化文本...",
+          disabled: true
         };
       default:
         return {
-          className: `${baseClasses} bg-gradient-to-br from-slate-100 to-slate-200`,
+          className: `${buttonStyle} cursor-pointer`,
           tooltip: "点击开始录音",
+          disabled: false
         };
     }
   };
@@ -384,14 +431,7 @@ export default function App() {
             蛐蛐
           </h1>
           <div className="flex items-center space-x-3 non-draggable">
-            {/* 模型状态灯 */}
-            <StatusLight
-              modelStatus={modelStatus}
-              size="w-4 h-4"
-              showTooltip={true}
-            />
-            
-            <Tooltip content="历史记录" emoji="📋">
+            <Tooltip content="历史记录">
               <button
                 onClick={handleOpenHistory}
                 className="p-3 hover:bg-white/70 dark:hover:bg-gray-700/70 rounded-xl transition-colors shadow-sm"
@@ -399,7 +439,7 @@ export default function App() {
                 <History className="w-6 h-6 text-gray-700 dark:text-gray-300" />
               </button>
             </Tooltip>
-            <Tooltip content="设置" emoji="⚙️">
+            <Tooltip content="设置">
               <button
                 onClick={handleOpenSettings}
                 className="p-3 hover:bg-white/70 dark:hover:bg-gray-700/70 rounded-xl transition-colors shadow-sm"
@@ -415,63 +455,50 @@ export default function App() {
           <Tooltip content={micProps.tooltip}>
             <button
               onClick={(e) => {
-                if (handleClick(e)) {
+                if (handleClick(e) && !micProps.disabled) {
                   toggleRecording();
                 }
               }}
-              onMouseEnter={() => setIsHovered(true)}
+              onMouseEnter={() => {
+                if (!micProps.disabled) {
+                  setIsHovered(true);
+                }
+              }}
               onMouseLeave={() => setIsHovered(false)}
               className={`${micProps.className} non-draggable shadow-lg`}
-              disabled={micState === "processing"}
-              style={{
-                cursor: micState === "processing" ? "not-allowed" : "pointer",
-              }}
+              disabled={micProps.disabled}
             >
               {/* 动态内容基于状态 */}
-              {micState === "idle" || micState === "hover" ? (
-                <SoundWaveIcon size={20} isActive={micState === "hover"} />
+              {!modelStatus.isReady ? (
+                <LoadingIndicator size={20} />
+              ) : micState === "idle" ? (
+                <SoundWaveIcon size={20} isActive={false} />
+              ) : micState === "hover" ? (
+                <SoundWaveIcon size={20} isActive={false} />
               ) : micState === "recording" ? (
-                <Mic className="w-7 h-7 text-white drop-shadow-lg" />
+                <SoundWaveIcon size={20} isActive={true} />
               ) : micState === "processing" ? (
                 <VoiceWaveIndicator isListening={true} />
               ) : micState === "optimizing" ? (
-                <div className="text-white text-lg">🤖</div>
+                <LoadingIndicator size={20} />
               ) : null}
 
-              {/* 录音状态指示环 */}
-              {micState === "recording" && (
-                <div className="absolute inset-0 rounded-full border-2 border-red-300 animate-ping"></div>
-              )}
-
-              {/* 处理状态指示环 */}
-              {micState === "processing" && (
-                <div className="absolute inset-0 rounded-full border-2 border-blue-300 opacity-50"></div>
-              )}
-
-              {/* AI优化状态指示环 */}
-              {micState === "optimizing" && (
-                <div className="absolute inset-0 rounded-full border-2 border-emerald-300 animate-pulse"></div>
-              )}
+              {/* 移除所有状态指示环，保持简洁 */}
             </button>
           </Tooltip>
           
           <p className="mt-4 status-text text-gray-700 dark:text-gray-300">
-            {micState === "recording"
-              ? "🔴 正在录音，再次点击停止"
-              : micState === "processing"
-              ? modelStatus.isReady
-                ? "⚡ 正在识别语音..."
-                : "⚡ 正在识别语音...（首次使用需要下载模型，请耐心等待）"
-              : micState === "optimizing"
-              ? "🤖 AI正在优化文本，请稍候..."
-              : modelStatus.isReady
-              ? `🎤 点击麦克风或按 ${hotkey} 开始录音`
-              : modelStatus.isLoading
-              ? "🤖 AI模型加载中，请稍候..."
-              : modelStatus.error
-              ? "❌ 模型加载失败，请检查网络连接"
-              : `🎤 点击麦克风或按 ${hotkey} 开始录音（首次使用需要下载模型）`
-            }
+            {!modelStatus.isReady ? (
+              "FunASR服务器启动中，请稍候..."
+            ) : micState === "recording" ? (
+              "正在录音，再次点击停止"
+            ) : micState === "processing" ? (
+              "正在识别语音..."
+            ) : micState === "optimizing" ? (
+              "AI正在优化文本，请稍候..."
+            ) : (
+              `点击麦克风或按 ${hotkey} 开始录音`
+            )}
           </p>
         </div>
 

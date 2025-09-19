@@ -94,7 +94,7 @@
     "files": [
       "main.js",
       "preload.js",
-      "funasr_bridge.py",
+      "funasr_server.py",
       "src/dist/**/*",
       "assets/**/*",
       "node_modules/**/*"

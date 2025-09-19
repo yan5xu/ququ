@@ -18,19 +18,6 @@ class FunASRManager {
     this.serverReady = false; // 服务器是否就绪
   }
 
-  getFunASRScriptPath() {
-    // 在生产环境中，文件从 ASAR 中解包
-    if (process.env.NODE_ENV === "development") {
-      return path.join(__dirname, "..", "..", "funasr_bridge.py");
-    } else {
-      // 在生产环境中，使用解包路径
-      return path.join(
-        process.resourcesPath,
-        "app.asar.unpacked",
-        "funasr_bridge.py"
-      );
-    }
-  }
 
   getFunASRServerPath() {
     // 获取FunASR服务器脚本路径
@@ -449,34 +436,29 @@ class FunASRManager {
     const tempAudioPath = await this.createTempAudioFile(audioBlob);
     
     try {
-      let result;
-      
-      if (this.serverReady) {
-        // 使用服务器模式
-        console.log('使用FunASR服务器模式进行转录');
-        result = await this._sendServerCommand({
-          action: 'transcribe',
-          audio_path: tempAudioPath,
-          options: options
-        });
-        
-        if (!result.success) {
-          throw new Error(result.error || '转录失败');
-        }
-        
-        return {
-          success: true,
-          text: result.text.trim(),
-          raw_text: result.raw_text,
-          confidence: result.confidence || 0.0,
-          language: result.language || "zh-CN"
-        };
-      } else {
-        // 回退到原始模式
-        console.log('回退到FunASR进程模式进行转录');
-        const stdout = await this.runFunASRProcess(tempAudioPath, options);
-        return this.parseFunASRResult(stdout);
+      if (!this.serverReady) {
+        throw new Error('FunASR服务器未就绪，请稍后重试');
       }
+      
+      // 使用服务器模式
+      console.log('使用FunASR服务器模式进行转录');
+      const result = await this._sendServerCommand({
+        action: 'transcribe',
+        audio_path: tempAudioPath,
+        options: options
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '转录失败');
+      }
+      
+      return {
+        success: true,
+        text: result.text.trim(),
+        raw_text: result.raw_text,
+        confidence: result.confidence || 0.0,
+        language: result.language || "zh-CN"
+      };
     } catch (error) {
       throw error;
     } finally {
@@ -523,188 +505,6 @@ class FunASRManager {
     return tempAudioPath;
   }
 
-  async runFunASRProcess(tempAudioPath, options) {
-    const pythonCmd = await this.findPythonExecutable();
-    const funasrScriptPath = this.getFunASRScriptPath();
-    
-    // 检查 FunASR 脚本是否存在
-    if (!fs.existsSync(funasrScriptPath)) {
-      throw new Error(`FunASR 脚本未找到: ${funasrScriptPath}`);
-    }
-    
-    const args = [funasrScriptPath, "transcribe", "--audio", tempAudioPath];
-    
-    // 添加选项
-    if (options) {
-      args.push("--options", JSON.stringify(options));
-    }
-
-    return new Promise((resolve, reject) => {
-      const funasrProcess = spawn(pythonCmd, args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-      });
-
-      let stdout = "";
-      let stderr = "";
-      let isResolved = false;
-
-      // 设置超时 - 如果模型已初始化，使用较短超时；否则使用长超时
-      const timeoutDuration = this.modelsInitialized ? 60000 : 600000; // 1分钟或10分钟
-      const timeout = setTimeout(() => {
-        if (!isResolved) {
-          funasrProcess.kill("SIGTERM");
-          const timeoutMsg = this.modelsInitialized
-            ? "FunASR 转录超时 (1 分钟)"
-            : "FunASR 转录超时 (10 分钟) - 可能是首次下载模型导致，请稍后重试";
-          reject(new Error(timeoutMsg));
-        }
-      }, timeoutDuration);
-
-      funasrProcess.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      funasrProcess.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      funasrProcess.on("close", (code) => {
-        if (isResolved) return;
-        isResolved = true;
-        clearTimeout(timeout);
-
-        console.log('FunASR 进程关闭:', {
-          code,
-          stdoutLength: stdout.length,
-          stderrLength: stderr.length
-        });
-
-        if (code === 0) {
-          resolve(stdout);
-        } else {
-          // 提供更详细的错误信息
-          let errorMsg = `FunASR 转录失败 (代码 ${code})`;
-          if (stderr.includes("ModuleNotFoundError")) {
-            errorMsg = "FunASR 模块未找到，请检查安装";
-          } else if (stderr.includes("CUDA") || stderr.includes("GPU")) {
-            errorMsg = "GPU 相关错误，将使用 CPU 模式";
-          } else if (stderr.includes("download") || stderr.includes("网络")) {
-            errorMsg = "模型下载失败，请检查网络连接";
-          } else if (stderr.includes("memory") || stderr.includes("内存")) {
-            errorMsg = "内存不足，请关闭其他应用程序";
-          }
-          
-          reject(new Error(`${errorMsg}: ${stderr.slice(0, 200)}...`));
-        }
-      });
-
-      funasrProcess.on("error", (error) => {
-        if (isResolved) return;
-        isResolved = true;
-        clearTimeout(timeout);
-        reject(new Error(`FunASR 进程错误: ${error.message}`));
-      });
-    });
-  }
-
-  parseFunASRResult(stdout) {
-    console.log('解析结果，stdout 长度:', stdout.length);
-    
-    try {
-      // 清理 stdout，移除任何非 JSON 内容
-      const lines = stdout.split("\n").filter((line) => line.trim());
-      console.log('FunASR 原始输出:', stdout);
-      console.log('所有输出行:', lines);
-      
-      // 方法1: 查找单行JSON（以 { 开始，以 } 结束）
-      let jsonLine = "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-          jsonLine = trimmed;
-          break;
-        }
-      }
-
-      // 方法2: 如果没有找到单行JSON，尝试解析多行JSON
-      if (!jsonLine) {
-        // 查找JSON开始和结束的位置
-        let jsonStartIndex = -1;
-        let jsonEndIndex = -1;
-        
-        for (let i = 0; i < lines.length; i++) {
-          const trimmed = lines[i].trim();
-          if (trimmed === "{" && jsonStartIndex === -1) {
-            jsonStartIndex = i;
-          }
-          if (trimmed === "}" && jsonStartIndex !== -1) {
-            jsonEndIndex = i;
-            break;
-          }
-        }
-        
-        if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
-          // 合并JSON行
-          const jsonLines = lines.slice(jsonStartIndex, jsonEndIndex + 1);
-          jsonLine = jsonLines.join("");
-        }
-      }
-
-      // 方法3: 如果还是没有找到，尝试查找包含关键字段的JSON片段
-      if (!jsonLine) {
-        // 查找包含 "success": true 的行附近的JSON
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes('"success": true')) {
-            // 向前和向后查找JSON边界
-            let start = i;
-            let end = i;
-            
-            // 向前查找 {
-            while (start >= 0 && !lines[start].trim().startsWith("{")) {
-              start--;
-            }
-            
-            // 向后查找 }
-            while (end < lines.length && !lines[end].trim().endsWith("}")) {
-              end++;
-            }
-            
-            if (start >= 0 && end < lines.length) {
-              const jsonLines = lines.slice(start, end + 1);
-              jsonLine = jsonLines.join("");
-              break;
-            }
-          }
-        }
-      }
-
-      if (!jsonLine) {
-        throw new Error("FunASR 响应中未找到 JSON 输出");
-      }
-
-      const result = JSON.parse(jsonLine);
-      
-      if (!result.success) {
-        return { success: false, message: result.error || "转录失败" };
-      }
-      
-      if (!result.text || result.text.trim().length === 0) {
-        return { success: false, message: "未检测到音频" };
-      }
-      
-      return {
-        success: true,
-        text: result.text.trim(),
-        raw_text: result.raw_text,
-        confidence: result.confidence || 0.0,
-        language: result.language || "zh-CN"
-      };
-    } catch (parseError) {
-      console.error('解析 FunASR 输出失败:', parseError);
-      throw new Error(`解析 FunASR 输出失败: ${parseError.message}`);
-    }
-  }
 
   async cleanupTempFile(tempAudioPath) {
     try {
@@ -716,57 +516,18 @@ class FunASRManager {
 
   async checkStatus() {
     try {
-      const pythonCmd = await this.findPythonExecutable();
-      const funasrScriptPath = this.getFunASRScriptPath();
-      
-      const args = [funasrScriptPath, "status"];
-
-      return new Promise((resolve, reject) => {
-        const statusProcess = spawn(pythonCmd, args, {
-          stdio: ["ignore", "pipe", "pipe"],
-          windowsHide: true,
-        });
-
-        let stdout = "";
-        let stderr = "";
-
-        statusProcess.stdout.on("data", (data) => {
-          stdout += data.toString();
-        });
-
-        statusProcess.stderr.on("data", (data) => {
-          stderr += data.toString();
-        });
-
-        statusProcess.on("close", (code) => {
-          if (code === 0) {
-            try {
-              const result = JSON.parse(stdout);
-              resolve(result);
-            } catch (parseError) {
-              resolve({
-                success: false,
-                error: "解析状态结果失败",
-                installed: false
-              });
-            }
-          } else {
-            resolve({
-              success: false,
-              error: stderr || "状态检查失败",
-              installed: false
-            });
-          }
-        });
-
-        statusProcess.on("error", (error) => {
-          resolve({
-            success: false,
-            error: error.message,
-            installed: false
-          });
-        });
-      });
+      if (this.serverReady) {
+        return await this._sendServerCommand({ action: 'status' });
+      } else {
+        // 检查FunASR是否已安装
+        const installStatus = await this.checkFunASRInstallation();
+        return {
+          success: installStatus.installed,
+          error: installStatus.installed ? "FunASR服务器正在启动中..." : "FunASR未安装",
+          installed: installStatus.installed,
+          initializing: this.initializationPromise !== null
+        };
+      }
     } catch (error) {
       return {
         success: false,

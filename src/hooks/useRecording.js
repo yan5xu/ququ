@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useTextProcessing } from './useTextProcessing';
+import { useModelStatus } from './useModelStatus';
 
 /**
  * 录音功能Hook
@@ -16,13 +17,25 @@ export const useRecording = () => {
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
   
-  // 使用文本处理Hook
+  // 使用文本处理Hook和模型状态Hook
   const { processText } = useTextProcessing();
+  const modelStatus = useModelStatus();
 
   // 开始录音
   const startRecording = useCallback(async () => {
     try {
       setError(null);
+      
+      // 检查FunASR是否就绪
+      if (!modelStatus.isReady) {
+        if (modelStatus.isLoading) {
+          throw new Error('FunASR服务器正在启动中，请稍候...');
+        } else if (modelStatus.error) {
+          throw new Error('FunASR服务器未就绪，请检查配置');
+        } else {
+          throw new Error('正在准备FunASR服务器，请稍候...');
+        }
+      }
       
       // 检查浏览器支持
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -92,7 +105,7 @@ export const useRecording = () => {
       setError(`无法开始录音: ${err.message}`);
       setIsRecording(false);
     }
-  }, []);
+  }, [modelStatus.isReady, modelStatus.isLoading, modelStatus.error]);
 
   // 停止录音
   const stopRecording = useCallback(() => {
