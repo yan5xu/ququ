@@ -162,8 +162,8 @@ export const useRecording = () => {
               if (window.electronAPI && window.electronAPI.log) {
                 window.electronAPI.log('info', '开始AI优化，原始文本:', result.text);
               }
-              // 调用AI进行内容优化（不包括标点恢复）
-              const enhanced = await processText(result.text, 'optimize');
+              // 调用AI进行内容优化，自动根据文本长度选择处理模式
+              const enhanced = await processText(result.text, 'auto');
               if (window.electronAPI && window.electronAPI.log) {
                 window.electronAPI.log('info', 'AI优化结果:', enhanced);
               }
