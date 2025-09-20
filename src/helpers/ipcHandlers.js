@@ -8,6 +8,7 @@ class IPCHandlers {
     this.funasrManager = managers.funasrManager;
     this.windowManager = managers.windowManager;
     this.hotkeyManager = managers.hotkeyManager;
+    this.logger = managers.logger; // 添加logger引用
     
     // 跟踪F2热键注册状态
     this.f2RegisteredSenders = new Set();
@@ -153,13 +154,7 @@ class IPCHandlers {
     });
 
     ipcMain.handle("paste-text", async (event, text) => {
-      try {
-        await this.clipboardManager.pasteText(text);
-        return { success: true };
-      } catch (error) {
-        console.error("粘贴文本失败:", error);
-        return { success: false, error: error.message };
-      }
+      return this.clipboardManager.pasteText(text);
     });
 
     ipcMain.handle("read-clipboard", async () => {
@@ -316,28 +311,42 @@ class IPCHandlers {
         }
         
         if (this.hotkeyManager) {
-          const success = this.hotkeyManager.registerF2DoubleClick((data) => {
-            // 发送F2双击事件到所有注册的渲染进程
-            console.log("发送F2双击事件到渲染进程:", data);
-            this.f2RegisteredSenders.forEach(id => {
-              const window = require("electron").BrowserWindow.getAllWindows().find(w => w.webContents.id === id);
-              if (window && !window.isDestroyed()) {
-                window.webContents.send("f2-double-click", data);
-              }
-            });
-          });
+          // 只有在没有任何发送者注册时才注册热键
+          const isFirstRegistration = this.f2RegisteredSenders.size === 0;
           
-          if (success) {
-            this.f2RegisteredSenders.add(senderId);
-            
-            // 监听窗口关闭事件，清理注册记录
-            event.sender.on('destroyed', () => {
-              this.f2RegisteredSenders.delete(senderId);
-              console.log(`清理发送者 ${senderId} 的F2热键注册记录`);
+          if (isFirstRegistration) {
+            const success = this.hotkeyManager.registerF2DoubleClick((data) => {
+              // 发送F2双击事件到所有注册的渲染进程
+              console.log("发送F2双击事件到渲染进程:", data);
+              this.f2RegisteredSenders.forEach(id => {
+                const window = require("electron").BrowserWindow.getAllWindows().find(w => w.webContents.id === id);
+                if (window && !window.isDestroyed()) {
+                  window.webContents.send("f2-double-click", data);
+                }
+              });
             });
+            
+            if (!success) {
+              return { success: false, error: "F2热键注册失败" };
+            }
           }
           
-          return { success };
+          // 添加发送者到跟踪列表
+          this.f2RegisteredSenders.add(senderId);
+          
+          // 监听窗口关闭事件，清理注册记录
+          event.sender.on('destroyed', () => {
+            this.f2RegisteredSenders.delete(senderId);
+            console.log(`清理发送者 ${senderId} 的F2热键注册记录`);
+            
+            // 如果没有发送者了，注销热键
+            if (this.f2RegisteredSenders.size === 0) {
+              this.hotkeyManager.unregisterHotkey('F2');
+              console.log('所有发送者都已注销，注销F2热键');
+            }
+          });
+          
+          return { success: true };
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
@@ -431,14 +440,64 @@ class IPCHandlers {
       };
     });
 
-    ipcMain.handle("check-permissions", () => {
-      // TODO: 实现权限检查功能
-      return { microphone: true, accessibility: true };
+    ipcMain.handle("check-permissions", async () => {
+      try {
+        // 检查辅助功能权限
+        const hasAccessibility = await this.clipboardManager.checkAccessibilityPermissions();
+        
+        return {
+          microphone: true, // 麦克风权限由前端检查
+          accessibility: hasAccessibility
+        };
+      } catch (error) {
+        console.error("检查权限失败:", error);
+        return {
+          microphone: false,
+          accessibility: false,
+          error: error.message
+        };
+      }
     });
 
-    ipcMain.handle("request-permissions", () => {
-      // TODO: 实现权限请求功能
-      return { success: true };
+    ipcMain.handle("request-permissions", async () => {
+      try {
+        // 对于辅助功能权限，我们只能引导用户手动授予
+        // 这里可以打开系统设置页面
+        if (process.platform === "darwin") {
+          this.clipboardManager.openSystemSettings();
+        }
+        return { success: true };
+      } catch (error) {
+        console.error("请求权限失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 测试辅助功能权限
+    ipcMain.handle("test-accessibility-permission", async () => {
+      try {
+        // 使用测试文本检查权限
+        await this.clipboardManager.pasteText("蛐蛐权限测试");
+        return { success: true, message: "辅助功能权限测试成功" };
+      } catch (error) {
+        console.error("辅助功能权限测试失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 打开系统权限设置
+    ipcMain.handle("open-system-permissions", () => {
+      try {
+        if (process.platform === "darwin") {
+          this.clipboardManager.openSystemSettings();
+          return { success: true };
+        } else {
+          return { success: false, error: "当前平台不支持自动打开权限设置" };
+        }
+      } catch (error) {
+        console.error("打开系统权限设置失败:", error);
+        return { success: false, error: error.message };
+      }
     });
 
     // 应用信息
@@ -559,6 +618,192 @@ class IPCHandlers {
         }
       });
     }
+
+    // 日志和调试相关
+    ipcMain.handle("get-app-logs", (event, lines = 100) => {
+      try {
+        if (this.logger && this.logger.getRecentLogs) {
+          return {
+            success: true,
+            logs: this.logger.getRecentLogs(lines)
+          };
+        }
+        return {
+          success: false,
+          error: "日志管理器不可用"
+        };
+      } catch (error) {
+        console.error("获取应用日志失败:", error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
+
+    ipcMain.handle("get-funasr-logs", (event, lines = 100) => {
+      try {
+        if (this.logger && this.logger.getFunASRLogs) {
+          return {
+            success: true,
+            logs: this.logger.getFunASRLogs(lines)
+          };
+        }
+        return {
+          success: false,
+          error: "日志管理器不可用"
+        };
+      } catch (error) {
+        console.error("获取FunASR日志失败:", error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
+
+    ipcMain.handle("get-log-file-path", () => {
+      try {
+        if (this.logger && this.logger.getLogFilePath) {
+          return {
+            success: true,
+            appLogPath: this.logger.getLogFilePath(),
+            funasrLogPath: this.logger.getFunASRLogFilePath()
+          };
+        }
+        return {
+          success: false,
+          error: "日志管理器不可用"
+        };
+      } catch (error) {
+        console.error("获取日志文件路径失败:", error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
+
+    ipcMain.handle("open-log-file", (event, logType = 'app') => {
+      try {
+        if (this.logger) {
+          const logPath = logType === 'funasr'
+            ? this.logger.getFunASRLogFilePath()
+            : this.logger.getLogFilePath();
+          
+          require("electron").shell.showItemInFolder(logPath);
+          return { success: true };
+        }
+        return {
+          success: false,
+          error: "日志管理器不可用"
+        };
+      } catch (error) {
+        console.error("打开日志文件失败:", error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
+
+    ipcMain.handle("get-system-debug-info", () => {
+      try {
+        const debugInfo = {
+          system: {
+            platform: process.platform,
+            arch: process.arch,
+            nodeVersion: process.version,
+            electronVersion: process.versions.electron,
+            appVersion: require("electron").app.getVersion()
+          },
+          environment: {
+            NODE_ENV: process.env.NODE_ENV,
+            PATH: process.env.PATH,
+            PYTHON_PATH: process.env.PYTHON_PATH,
+            AI_API_KEY: process.env.AI_API_KEY ? '已设置' : '未设置',
+            AI_BASE_URL: process.env.AI_BASE_URL || '未设置',
+            AI_MODEL: process.env.AI_MODEL || '未设置'
+          },
+          funasrStatus: {
+            isInitialized: this.funasrManager.isInitialized,
+            modelsInitialized: this.funasrManager.modelsInitialized,
+            serverReady: this.funasrManager.serverReady,
+            pythonCmd: this.funasrManager.pythonCmd
+          }
+        };
+
+        if (this.logger && this.logger.getSystemInfo) {
+          debugInfo.loggerInfo = this.logger.getSystemInfo();
+        }
+
+        return {
+          success: true,
+          debugInfo
+        };
+      } catch (error) {
+        console.error("获取系统调试信息失败:", error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
+
+    ipcMain.handle("test-python-environment", async () => {
+      try {
+        this.logger && this.logger.info && this.logger.info('开始测试Python环境');
+        
+        const pythonCmd = await this.funasrManager.findPythonExecutable();
+        const funasrStatus = await this.funasrManager.checkFunASRInstallation();
+        
+        const testResult = {
+          success: true,
+          pythonCmd,
+          funasrStatus,
+          timestamp: new Date().toISOString()
+        };
+
+        this.logger && this.logger.info && this.logger.info('Python环境测试完成', testResult);
+        
+        return testResult;
+      } catch (error) {
+        const errorResult = {
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        };
+
+        this.logger && this.logger.error && this.logger.error('Python环境测试失败', errorResult);
+        
+        return errorResult;
+      }
+    });
+
+    ipcMain.handle("restart-funasr-server", async () => {
+      try {
+        this.logger && this.logger.info && this.logger.info('手动重启FunASR服务器');
+        
+        // 停止现有服务器
+        if (this.funasrManager.serverProcess) {
+          await this.funasrManager._stopFunASRServer();
+        }
+        
+        // 重新启动
+        await this.funasrManager.preInitializeModels();
+        
+        return {
+          success: true,
+          message: 'FunASR服务器重启完成'
+        };
+      } catch (error) {
+        this.logger && this.logger.error && this.logger.error('重启FunASR服务器失败', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    });
   }
 
   // AI文本处理方法

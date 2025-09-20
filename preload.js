@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSystemInfo: () => ipcRenderer.invoke("get-system-info"),
   checkPermissions: () => ipcRenderer.invoke("check-permissions"),
   requestPermissions: () => ipcRenderer.invoke("request-permissions"),
+  testAccessibilityPermission: () => ipcRenderer.invoke("test-accessibility-permission"),
+  openSystemPermissions: () => ipcRenderer.invoke("open-system-permissions"),
 
   // 应用信息
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),

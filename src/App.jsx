@@ -7,7 +7,9 @@ import { useWindowDrag } from "./hooks/useWindowDrag";
 import { useRecording } from "./hooks/useRecording";
 import { useTextProcessing } from "./hooks/useTextProcessing";
 import { useModelStatus } from "./hooks/useModelStatus";
+import { usePermissions } from "./hooks/usePermissions";
 import { Mic, MicOff, Settings, History, Copy, Download } from "lucide-react";
+import SettingsPanel from "./components/SettingsPanel";
 
 // 声波图标组件（空闲/悬停状态）
 const SoundWaveIcon = ({ size = 16, isActive = false }) => {
@@ -176,6 +178,7 @@ export default function App() {
   const [originalText, setOriginalText] = useState("");
   const [processedText, setProcessedText] = useState("");
   const [showTextArea, setShowTextArea] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const { isDragging, handleMouseDown, handleMouseMove, handleMouseUp, handleClick } = useWindowDrag();
   const modelStatus = useModelStatus();
@@ -195,31 +198,50 @@ export default function App() {
     error: textProcessingError
   } = useTextProcessing();
 
+  // 防重复粘贴的引用
+  const lastPasteRef = useRef({ text: '', timestamp: 0 });
+  const PASTE_DEBOUNCE_TIME = 1000; // 1秒内相同文本不重复粘贴
+
   // 安全粘贴函数
   const safePaste = useCallback(async (text) => {
+    const now = Date.now();
+    const lastPaste = lastPasteRef.current;
+    
+    // 防重复粘贴：如果是相同文本且在防抖时间内，则跳过
+    if (lastPaste.text === text && (now - lastPaste.timestamp) < PASTE_DEBOUNCE_TIME) {
+      console.log("🚫 跳过重复粘贴，文本:", text.substring(0, 50) + "...");
+      return;
+    }
+    
+    // 更新最后粘贴记录
+    lastPasteRef.current = { text, timestamp: now };
+    
+    console.log("🔄 safePaste 被调用，文本:", text.substring(0, 50) + "...");
     try {
       if (window.electronAPI) {
-        const result = await window.electronAPI.pasteText(text);
-        if (result.success) {
-          toast.success("文本已自动粘贴到当前输入框");
-        } else {
-          // 粘贴失败，但文本已复制到剪贴板
-          toast.warning(`自动粘贴失败，文本已复制到剪贴板。${result.error || ""}`);
-        }
+        console.log("📱 使用 Electron API 进行粘贴");
+        await window.electronAPI.pasteText(text);
+        console.log("✅ 粘贴成功");
+        toast.success("文本已自动粘贴到当前输入框");
       } else {
         // Web环境下只能复制到剪贴板
+        console.log("🌐 Web环境，仅复制到剪贴板");
         await navigator.clipboard.writeText(text);
         toast.info("文本已复制到剪贴板，请手动粘贴");
       }
     } catch (error) {
-      console.error("粘贴文本失败:", error);
-      toast.error(`粘贴失败: ${error.message}`);
+      console.error("❌ 粘贴文本失败:", error);
+      toast.error("粘贴失败", {
+        description: "请检查辅助功能权限。文本已复制到剪贴板 - 请手动使用 Cmd+V 粘贴。"
+      });
     }
   }, []);
 
   // 处理录音完成（FunASR识别完成）
   const handleRecordingComplete = useCallback(async (transcriptionResult) => {
+    console.log("🎤 handleRecordingComplete 被调用:", transcriptionResult);
     if (transcriptionResult.success && transcriptionResult.text) {
+      console.log("✅ 转录成功，文本:", transcriptionResult.text);
       // 立即显示FunASR识别的原始文本
       setOriginalText(transcriptionResult.text);
       setShowTextArea(true);
@@ -227,8 +249,8 @@ export default function App() {
       // 清空之前的处理结果，等待AI优化
       setProcessedText("");
 
-      // 立即粘贴FunASR识别结果 - 不等待AI优化
-      const pastePromise = safePaste(transcriptionResult.text);
+      // 不立即粘贴，等待AI优化完成后再粘贴
+      console.log("⏳ 等待AI优化完成后再进行粘贴...");
       
       // 并行保存到数据库
       const savePromise = window.electronAPI?.saveTranscription({
@@ -242,12 +264,11 @@ export default function App() {
         enhanced_by_ai: false
       }).catch(err => console.warn("保存转录记录失败:", err));
 
-      // 等待粘贴完成
-      await pastePromise;
-
       toast.success("🎤 语音识别完成，AI正在优化文本...");
+    } else {
+      console.log("❌ 转录失败或无文本:", transcriptionResult);
     }
-  }, [safePaste]);
+  }, []);
 
   // 处理AI优化完成
   const handleAIOptimizationComplete = useCallback(async (optimizedResult) => {
@@ -256,15 +277,23 @@ export default function App() {
       // 显示AI优化后的文本
       setProcessedText(optimizedResult.text);
       
-      // 可选：如果AI优化后的文本与原文差异较大，可以再次粘贴优化后的文本
-      // 这里我们选择不自动粘贴，让用户手动选择是否使用优化后的文本
+      // 自动粘贴AI优化后的文本
+      console.log("📋 准备粘贴AI优化后的文本:", optimizedResult.text);
+      await safePaste(optimizedResult.text);
+      console.log("✅ AI优化文本粘贴完成");
       
-      toast.success("🤖 AI文本优化完成！");
+      toast.success("🤖 AI文本优化完成并已自动粘贴！");
       console.log('AI优化文本已设置:', optimizedResult.text);
     } else {
-      console.warn('AI优化结果无效:', optimizedResult);
+      console.warn('AI优化结果无效，使用原始文本:', optimizedResult);
+      // 如果AI优化失败，则粘贴原始文本
+      if (originalText) {
+        console.log("📋 AI优化失败，粘贴原始文本:", originalText);
+        await safePaste(originalText);
+        toast.info("AI优化失败，已粘贴原始识别文本");
+      }
     }
-  }, []);
+  }, [safePaste, originalText]);
 
   // 设置转录完成回调
   useEffect(() => {
@@ -376,9 +405,7 @@ export default function App() {
 
   // 处理打开设置
   const handleOpenSettings = () => {
-    if (window.electronAPI) {
-      window.electronAPI.openControlPanel();
-    }
+    setShowSettings(true);
   };
 
   // 处理打开历史记录
@@ -387,6 +414,7 @@ export default function App() {
       window.electronAPI.openHistoryWindow();
     }
   };
+
 
   // 监听全局热键
   useEffect(() => {
@@ -599,6 +627,12 @@ export default function App() {
           />
         </div>
       </div>
+
+      {/* 设置面板 */}
+      {showSettings && (
+        <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
     </div>
   );
 }

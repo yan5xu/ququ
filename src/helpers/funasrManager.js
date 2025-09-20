@@ -7,7 +7,8 @@ const PythonInstaller = require("./pythonInstaller");
 const { runCommand, TIMEOUTS } = require("../utils/process");
 
 class FunASRManager {
-  constructor() {
+  constructor(logger = null) {
+    this.logger = logger || console; // 使用传入的logger或默认console
     this.pythonCmd = null; // 缓存 Python 可执行文件路径
     this.funasrInstalled = null; // 缓存安装状态
     this.isInitialized = false; // 跟踪启动初始化是否完成
@@ -34,14 +35,22 @@ class FunASRManager {
 
   async initializeAtStartup() {
     try {
-      await this.findPythonExecutable();
-      await this.checkFunASRInstallation();
+      this.logger.info && this.logger.info('FunASR管理器启动初始化开始');
+      
+      const pythonCmd = await this.findPythonExecutable();
+      this.logger.info && this.logger.info('Python可执行文件找到', { pythonCmd });
+      
+      const funasrStatus = await this.checkFunASRInstallation();
+      this.logger.info && this.logger.info('FunASR安装状态检查完成', funasrStatus);
+      
       this.isInitialized = true;
       
       // 预初始化模型（异步进行，不阻塞启动）
       this.preInitializeModels();
+      this.logger.info && this.logger.info('FunASR管理器启动初始化完成');
     } catch (error) {
       // FunASR 在启动时不可用不是关键问题
+      this.logger.warn && this.logger.warn('FunASR启动初始化失败，但不影响应用启动', error);
       this.isInitialized = true;
     }
   }
@@ -58,26 +67,38 @@ class FunASRManager {
 
   async _startFunASRServer() {
     try {
-      console.log('启动FunASR服务器...');
+      this.logger.info && this.logger.info('启动FunASR服务器...');
       
       const status = await this.checkFunASRInstallation();
       if (!status.installed) {
-        console.log('FunASR未安装，跳过服务器启动');
+        this.logger.warn && this.logger.warn('FunASR未安装，跳过服务器启动');
         return;
       }
 
       const pythonCmd = await this.findPythonExecutable();
       const serverPath = this.getFunASRServerPath();
       
+      this.logger.info && this.logger.info('FunASR服务器配置', {
+        pythonCmd,
+        serverPath,
+        serverExists: fs.existsSync(serverPath)
+      });
+      
       if (!fs.existsSync(serverPath)) {
-        console.log('FunASR服务器脚本未找到，跳过服务器启动');
+        this.logger.error && this.logger.error('FunASR服务器脚本未找到，跳过服务器启动', { serverPath });
         return;
       }
 
       return new Promise((resolve) => {
+        this.logger.info && this.logger.info('启动FunASR Python进程', {
+          command: pythonCmd,
+          args: [serverPath]
+        });
+
         this.serverProcess = spawn(pythonCmd, [serverPath], {
           stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,
+          env: { ...process.env } // 确保环境变量传递
         });
 
         let initResponseReceived = false;
@@ -86,6 +107,7 @@ class FunASRManager {
           const lines = data.toString().split('\n').filter(line => line.trim());
           
           for (const line of lines) {
+            this.logger.debug && this.logger.debug('FunASR服务器输出', { line });
             try {
               const result = JSON.parse(line);
               
@@ -95,24 +117,30 @@ class FunASRManager {
                 if (result.success) {
                   this.serverReady = true;
                   this.modelsInitialized = true;
-                  console.log('FunASR服务器启动成功，模型已初始化');
+                  this.logger.info && this.logger.info('FunASR服务器启动成功，模型已初始化');
                 } else {
-                  console.log('FunASR服务器初始化失败:', result.error);
+                  this.logger.error && this.logger.error('FunASR服务器初始化失败', result);
                 }
                 resolve();
               }
             } catch (parseError) {
-              // 忽略非JSON输出
+              // 忽略非JSON输出，但记录到日志
+              this.logger.debug && this.logger.debug('FunASR服务器非JSON输出', { line });
             }
           }
         });
 
         this.serverProcess.stderr.on("data", (data) => {
-          console.log('FunASR服务器错误输出:', data.toString());
+          const errorOutput = data.toString();
+          this.logger.error && this.logger.error('FunASR服务器错误输出', { errorOutput });
+          // 同时记录到FunASR专用日志
+          if (this.logger.logFunASR) {
+            this.logger.logFunASR('error', 'Python stderr', { errorOutput });
+          }
         });
 
         this.serverProcess.on("close", (code) => {
-          console.log('FunASR服务器进程退出，代码:', code);
+          this.logger.warn && this.logger.warn('FunASR服务器进程退出', { code });
           this.serverProcess = null;
           this.serverReady = false;
           this.modelsInitialized = false;
@@ -123,7 +151,7 @@ class FunASRManager {
         });
 
         this.serverProcess.on("error", (error) => {
-          console.log('FunASR服务器进程错误:', error.message);
+          this.logger.error && this.logger.error('FunASR服务器进程错误', error);
           this.serverProcess = null;
           this.serverReady = false;
           
@@ -135,7 +163,7 @@ class FunASRManager {
         // 设置超时
         setTimeout(() => {
           if (!initResponseReceived) {
-            console.log('FunASR服务器启动超时');
+            this.logger.warn && this.logger.warn('FunASR服务器启动超时');
             if (this.serverProcess) {
               this.serverProcess.kill();
             }
@@ -144,7 +172,7 @@ class FunASRManager {
         }, 120000); // 2分钟超时
       });
     } catch (error) {
-      console.log('启动FunASR服务器异常:', error.message);
+      this.logger.error && this.logger.error('启动FunASR服务器异常', error);
     }
   }
 

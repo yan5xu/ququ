@@ -14,14 +14,36 @@ import signal
 from pathlib import Path
 
 # 设置日志
+import tempfile
+import os
+
+# 获取日志文件路径
+def get_log_path():
+    # 尝试从环境变量获取用户数据目录
+    if 'ELECTRON_USER_DATA' in os.environ:
+        log_dir = os.path.join(os.environ['ELECTRON_USER_DATA'], 'logs')
+    else:
+        # 回退到临时目录
+        log_dir = os.path.join(tempfile.gettempdir(), 'ququ_logs')
+    
+    # 确保日志目录存在
+    os.makedirs(log_dir, exist_ok=True)
+    return os.path.join(log_dir, 'funasr_server.log')
+
+log_file_path = get_log_path()
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('funasr_server.log', encoding='utf-8')
+        logging.FileHandler(log_file_path, encoding='utf-8'),
+        logging.StreamHandler()  # 同时输出到控制台
     ]
 )
 logger = logging.getLogger(__name__)
+
+# 记录日志文件位置
+logger.info(f"FunASR服务器日志文件: {log_file_path}")
 
 class FunASRServer:
     def __init__(self):

@@ -18,7 +18,6 @@ class HotkeyManager {
     if (this.registeredHotkeys.has('F2')) {
       console.log('F2热键已注册，更新回调函数');
       this.onF2DoubleClick = callback;
-      this.registeredHotkeys.set('F2', callback);
       return true;
     }
     

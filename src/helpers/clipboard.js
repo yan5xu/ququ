@@ -20,11 +20,6 @@ class ClipboardManager {
     }
   }
 
-  /**
-   * 将文本粘贴到当前活跃的输入框
-   * @param {string} text - 要粘贴的文本
-   * @returns {Promise<void>}
-   */
   async pasteText(text) {
     try {
       // 首先保存原始剪贴板内容
@@ -69,11 +64,6 @@ class ClipboardManager {
     }
   }
 
-  /**
-   * macOS 平台的粘贴实现
-   * @param {string} originalClipboard - 原始剪贴板内容
-   * @returns {Promise<void>}
-   */
   async pasteMacOS(originalClipboard) {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -131,11 +121,6 @@ class ClipboardManager {
     });
   }
 
-  /**
-   * Windows 平台的粘贴实现
-   * @param {string} originalClipboard - 原始剪贴板内容
-   * @returns {Promise<void>}
-   */
   async pasteWindows(originalClipboard) {
     return new Promise((resolve, reject) => {
       const pasteProcess = spawn("powershell", [
@@ -169,11 +154,6 @@ class ClipboardManager {
     });
   }
 
-  /**
-   * Linux 平台的粘贴实现
-   * @param {string} originalClipboard - 原始剪贴板内容
-   * @returns {Promise<void>}
-   */
   async pasteLinux(originalClipboard) {
     return new Promise((resolve, reject) => {
       const pasteProcess = spawn("xdotool", ["key", "ctrl+v"]);
@@ -204,10 +184,6 @@ class ClipboardManager {
     });
   }
 
-  /**
-   * 检查 macOS 辅助功能权限
-   * @returns {Promise<boolean>}
-   */
   async checkAccessibilityPermissions() {
     if (process.platform !== "darwin") return true;
 
@@ -244,10 +220,6 @@ class ClipboardManager {
     });
   }
 
-  /**
-   * 显示辅助功能权限设置对话框
-   * @param {string} testError - 测试错误信息
-   */
   showAccessibilityDialog(testError) {
     const isStuckPermission =
       testError.includes("not allowed assistive access") ||
@@ -308,9 +280,6 @@ class ClipboardManager {
     });
   }
 
-  /**
-   * 打开系统设置到辅助功能页面
-   */
   openSystemSettings() {
     const settingsCommands = [
       [
