@@ -148,7 +148,7 @@ class IPCHandlers {
       try {
         return await this.clipboardManager.copyText(text);
       } catch (error) {
-        console.error("复制文本失败:", error);
+        this.logger.error("复制文本失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -162,7 +162,7 @@ class IPCHandlers {
         const text = await this.clipboardManager.readClipboard();
         return { success: true, text };
       } catch (error) {
-        console.error("读取剪贴板失败:", error);
+        this.logger.error("读取剪贴板失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -171,7 +171,7 @@ class IPCHandlers {
       try {
         return await this.clipboardManager.writeClipboard(text);
       } catch (error) {
-        console.error("写入剪贴板失败:", error);
+        this.logger.error("写入剪贴板失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -266,7 +266,7 @@ class IPCHandlers {
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
-        console.error("注册热键失败:", error);
+        this.logger.error("注册热键失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -279,7 +279,7 @@ class IPCHandlers {
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
-        console.error("注销热键失败:", error);
+        this.logger.error("注销热键失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -294,7 +294,7 @@ class IPCHandlers {
         }
         return "CommandOrControl+Shift+Space";
       } catch (error) {
-        console.error("获取当前热键失败:", error);
+        this.logger.error("获取当前热键失败:", error);
         return "CommandOrControl+Shift+Space";
       }
     });
@@ -306,7 +306,7 @@ class IPCHandlers {
         
         // 检查是否已经为这个发送者注册过F2热键
         if (this.f2RegisteredSenders.has(senderId)) {
-          console.log(`F2热键已为发送者 ${senderId} 注册过，跳过重复注册`);
+          this.logger.info(`F2热键已为发送者 ${senderId} 注册过，跳过重复注册`);
           return { success: true };
         }
         
@@ -317,7 +317,7 @@ class IPCHandlers {
           if (isFirstRegistration) {
             const success = this.hotkeyManager.registerF2DoubleClick((data) => {
               // 发送F2双击事件到所有注册的渲染进程
-              console.log("发送F2双击事件到渲染进程:", data);
+              this.logger.info("发送F2双击事件到渲染进程:", data);
               this.f2RegisteredSenders.forEach(id => {
                 const window = require("electron").BrowserWindow.getAllWindows().find(w => w.webContents.id === id);
                 if (window && !window.isDestroyed()) {
@@ -337,12 +337,12 @@ class IPCHandlers {
           // 监听窗口关闭事件，清理注册记录
           event.sender.on('destroyed', () => {
             this.f2RegisteredSenders.delete(senderId);
-            console.log(`清理发送者 ${senderId} 的F2热键注册记录`);
-            
+            this.logger.info(`清理发送者 ${senderId} 的F2热键注册记录`);
+
             // 如果没有发送者了，注销热键
             if (this.f2RegisteredSenders.size === 0) {
               this.hotkeyManager.unregisterHotkey('F2');
-              console.log('所有发送者都已注销，注销F2热键');
+              this.logger.info('所有发送者都已注销，注销F2热键');
             }
           });
           
@@ -350,7 +350,7 @@ class IPCHandlers {
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
-        console.error("注册F2热键失败:", error);
+        this.logger.error("注册F2热键失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -365,16 +365,16 @@ class IPCHandlers {
           // 如果没有其他发送者注册F2热键，则注销热键
           if (this.f2RegisteredSenders.size === 0) {
             const success = this.hotkeyManager.unregisterHotkey('F2');
-            console.log('所有发送者都已注销，注销F2热键');
+            this.logger.info('所有发送者都已注销，注销F2热键');
             return { success };
           } else {
-            console.log(`发送者 ${senderId} 已注销，但还有其他发送者注册了F2热键`);
+            this.logger.info(`发送者 ${senderId} 已注销，但还有其他发送者注册了F2热键`);
             return { success: true };
           }
         }
         return { success: false, error: "热键管理器未初始化或未注册" };
       } catch (error) {
-        console.error("注销F2热键失败:", error);
+        this.logger.error("注销F2热键失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -387,7 +387,7 @@ class IPCHandlers {
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
-        console.error("设置录音状态失败:", error);
+        this.logger.error("设置录音状态失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -400,7 +400,7 @@ class IPCHandlers {
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
-        console.error("获取录音状态失败:", error);
+        this.logger.error("获取录音状态失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -450,7 +450,7 @@ class IPCHandlers {
           accessibility: hasAccessibility
         };
       } catch (error) {
-        console.error("检查权限失败:", error);
+        this.logger.error("检查权限失败:", error);
         return {
           microphone: false,
           accessibility: false,
@@ -468,7 +468,7 @@ class IPCHandlers {
         }
         return { success: true };
       } catch (error) {
-        console.error("请求权限失败:", error);
+        this.logger.error("请求权限失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -480,7 +480,7 @@ class IPCHandlers {
         await this.clipboardManager.pasteText("蛐蛐权限测试");
         return { success: true, message: "辅助功能权限测试成功" };
       } catch (error) {
-        console.error("辅助功能权限测试失败:", error);
+        this.logger.error("辅助功能权限测试失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -495,7 +495,7 @@ class IPCHandlers {
           return { success: false, error: "当前平台不支持自动打开权限设置" };
         }
       } catch (error) {
-        console.error("打开系统权限设置失败:", error);
+        this.logger.error("打开系统权限设置失败:", error);
         return { success: false, error: error.message };
       }
     });
@@ -516,7 +516,7 @@ class IPCHandlers {
 
     // 调试和日志
     ipcMain.handle("log", (event, level, message, data) => {
-      console[level](`[渲染进程] ${message}`, data || "");
+      this.logger[level](`[渲染进程] ${message}`, data || "");
       return true;
     });
 
@@ -532,7 +532,7 @@ class IPCHandlers {
 
     // 保持向后兼容性
     ipcMain.handle("log-message", (event, level, message, data) => {
-      console[level](`[渲染进程] ${message}`, data || "");
+      this.logger[level](`[渲染进程] ${message}`, data || "");
       return true;
     });
 
@@ -597,7 +597,7 @@ class IPCHandlers {
 
     // 错误报告
     ipcMain.handle("report-error", (event, error) => {
-      console.error("渲染进程错误:", error);
+      this.logger.error("渲染进程错误:", error);
       // TODO: 实现错误报告功能
       return true;
     });
@@ -633,7 +633,7 @@ class IPCHandlers {
           error: "日志管理器不可用"
         };
       } catch (error) {
-        console.error("获取应用日志失败:", error);
+        this.logger.error("获取应用日志失败:", error);
         return {
           success: false,
           error: error.message
@@ -654,7 +654,7 @@ class IPCHandlers {
           error: "日志管理器不可用"
         };
       } catch (error) {
-        console.error("获取FunASR日志失败:", error);
+        this.logger.error("获取FunASR日志失败:", error);
         return {
           success: false,
           error: error.message
@@ -676,7 +676,7 @@ class IPCHandlers {
           error: "日志管理器不可用"
         };
       } catch (error) {
-        console.error("获取日志文件路径失败:", error);
+        this.logger.error("获取日志文件路径失败:", error);
         return {
           success: false,
           error: error.message
@@ -699,7 +699,7 @@ class IPCHandlers {
           error: "日志管理器不可用"
         };
       } catch (error) {
-        console.error("打开日志文件失败:", error);
+        this.logger.error("打开日志文件失败:", error);
         return {
           success: false,
           error: error.message
@@ -742,7 +742,7 @@ class IPCHandlers {
           debugInfo
         };
       } catch (error) {
-        console.error("获取系统调试信息失败:", error);
+        this.logger.error("获取系统调试信息失败:", error);
         return {
           success: false,
           error: error.message
@@ -882,7 +882,7 @@ ${text}
         stream: false
       };
 
-      console.log('AI文本处理请求:', {
+      this.logger.info('AI文本处理请求:', {
         baseUrl,
         model,
         mode,
@@ -912,7 +912,7 @@ ${text}
 
       const data = await response.json();
 
-      console.log('AI文本处理响应:', {
+      this.logger.info('AI文本处理响应:', {
         status: response.status,
         data: data,
         usage: data.usage
@@ -926,7 +926,7 @@ ${text}
           model: model
         };
         
-        console.log('AI文本处理结果:', {
+        this.logger.info('AI文本处理结果:', {
           originalText: text.substring(0, 100) + (text.length > 100 ? '...' : ''),
           optimizedText: result.text.substring(0, 100) + (result.text.length > 100 ? '...' : ''),
           usage: result.usage
@@ -934,14 +934,14 @@ ${text}
         
         return result;
       } else {
-        console.error('AI API返回数据格式错误:', response.data);
+        this.logger.error('AI API返回数据格式错误:', response.data);
         return {
           success: false,
           error: 'AI API返回数据格式错误'
         };
       }
     } catch (error) {
-      console.error('AI文本处理失败:', error);
+      this.logger.error('AI文本处理失败:', error);
       
       let errorMessage = '文本处理失败';
       if (error.response) {

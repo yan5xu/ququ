@@ -3,9 +3,10 @@ const path = require("path");
 const fs = require("fs");
 
 class DatabaseManager {
-  constructor() {
+  constructor(logger = null) {
     this.db = null;
     this.dbPath = null;
+    this.logger = logger;
   }
 
   initialize(dataDirectory) {
@@ -188,7 +189,9 @@ class DatabaseManager {
       this.db.backup(backupPath);
       return true;
     } catch (error) {
-      console.error("数据库备份失败:", error);
+      if (this.logger && this.logger.error) {
+        this.logger.error("数据库备份失败:", error);
+      }
       return false;
     }
   }

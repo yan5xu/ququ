@@ -17,7 +17,9 @@ export const usePermissions = (showAlertDialog) => {
         alert("✅ 麦克风权限正常工作！现在可以进行语音录制了。");
       }
     } catch (err) {
-      console.error("麦克风权限被拒绝:", err);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('error', '麦克风权限被拒绝:', err);
+      }
       setMicPermissionGranted(false);
       if (showAlertDialog) {
         showAlertDialog({
@@ -43,7 +45,9 @@ export const usePermissions = (showAlertDialog) => {
         alert("✅ 辅助功能权限正常工作！请检查测试文本是否出现在其他应用中。");
       }
     } catch (err) {
-      console.error("辅助功能权限测试失败:", err);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('error', '辅助功能权限测试失败:', err);
+      }
       setAccessibilityPermissionGranted(false);
       if (showAlertDialog) {
         showAlertDialog({

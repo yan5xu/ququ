@@ -2,15 +2,16 @@ const { clipboard } = require("electron");
 const { spawn } = require("child_process");
 
 class ClipboardManager {
-  constructor() {
+  constructor(logger) {
     // 初始化剪贴板管理器
+    this.logger = logger;
   }
 
-  // 安全日志方法 - 仅在开发模式下记录
-  safeLog(...args) {
-    if (process.env.NODE_ENV === "development") {
+  // 安全日志方法 - 使用logManager记录
+  safeLog(message, data = null) {
+    if (this.logger) {
       try {
-        console.log(...args);
+        this.logger.info(message, data);
       } catch (error) {
         // 静默忽略 EPIPE 错误
         if (error.code !== "EPIPE") {
@@ -25,34 +26,30 @@ class ClipboardManager {
       // 首先保存原始剪贴板内容
       const originalClipboard = clipboard.readText();
       this.safeLog(
-        "💾 已保存原始剪贴板内容:",
+        "💾 已保存原始剪贴板内容",
         originalClipboard.substring(0, 50) + "..."
       );
 
       // 将文本复制到剪贴板 - 这总是有效的
       clipboard.writeText(text);
       this.safeLog(
-        "📋 文本已复制到剪贴板:",
+        "📋 文本已复制到剪贴板",
         text.substring(0, 50) + "..."
       );
 
       if (process.platform === "darwin") {
         // 首先检查辅助功能权限
-        this.safeLog(
-          "🔍 检查粘贴操作的辅助功能权限..."
-        );
+        this.safeLog("🔍 检查粘贴操作的辅助功能权限");
         const hasPermissions = await this.checkAccessibilityPermissions();
 
         if (!hasPermissions) {
-          this.safeLog(
-            "⚠️ 没有辅助功能权限 - 文本仅复制到剪贴板"
-          );
+          this.safeLog("⚠️ 没有辅助功能权限 - 文本仅复制到剪贴板");
           const errorMsg =
             "需要辅助功能权限才能自动粘贴。文本已复制到剪贴板 - 请手动使用 Cmd+V 粘贴。";
           throw new Error(errorMsg);
         }
 
-        this.safeLog("✅ 权限已授予，尝试粘贴...");
+        this.safeLog("✅ 权限已授予，尝试粘贴");
         return await this.pasteMacOS(originalClipboard);
       } else if (process.platform === "win32") {
         return await this.pasteWindows(originalClipboard);

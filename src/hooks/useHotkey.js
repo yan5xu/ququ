@@ -30,7 +30,9 @@ export const useHotkey = (onF2DoubleClick) => {
           }
         }
       } catch (error) {
-        console.warn('获取当前热键失败:', error);
+        if (window.electronAPI && window.electronAPI.log) {
+          window.electronAPI.log('warn', '获取当前热键失败:', error);
+        }
       }
     };
 
@@ -50,11 +52,15 @@ export const useHotkey = (onF2DoubleClick) => {
     
     // 只有主窗口才注册F2热键
     if (isControlPanel) {
-      console.log('控制面板窗口，跳过F2热键注册');
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('info', '控制面板窗口，跳过F2热键注册');
+      }
       return;
     }
 
-    console.log('主窗口首次注册F2双击监听器');
+    if (window.electronAPI && window.electronAPI.log) {
+      window.electronAPI.log('info', '主窗口首次注册F2双击监听器');
+    }
     
     let isComponentMounted = true; // 用于检查组件是否仍然挂载
     
@@ -65,20 +71,28 @@ export const useHotkey = (onF2DoubleClick) => {
         if (result.success && isComponentMounted) {
           f2RegisteredRef.current = true;
           setIsF2Registered(true);
-          console.log('F2热键注册成功');
+          if (window.electronAPI && window.electronAPI.log) {
+            window.electronAPI.log('info', 'F2热键注册成功');
+          }
         } else if (isComponentMounted) {
-          console.error('F2热键注册失败:', result.error);
+          if (window.electronAPI && window.electronAPI.log) {
+            window.electronAPI.log('error', 'F2热键注册失败:', result.error);
+          }
         }
       } catch (error) {
         if (isComponentMounted) {
-          console.error('F2热键注册异常:', error);
+          if (window.electronAPI && window.electronAPI.log) {
+            window.electronAPI.log('error', 'F2热键注册异常:', error);
+          }
         }
       }
     };
 
     // 监听F2双击事件
     const removeF2Listener = window.electronAPI.onF2DoubleClick((event, data) => {
-      console.log('收到F2双击事件:', data);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('info', '收到F2双击事件:', data);
+      }
       if (f2CallbackRef.current && isComponentMounted) {
         f2CallbackRef.current(data);
       }
@@ -92,10 +106,16 @@ export const useHotkey = (onF2DoubleClick) => {
       isComponentMounted = false;
       
       if (f2RegisteredRef.current && f2ListenerRef.current) {
-        console.log('组件卸载，清理F2双击监听器');
+        if (window.electronAPI && window.electronAPI.log) {
+          window.electronAPI.log('info', '组件卸载，清理F2双击监听器');
+        }
         f2ListenerRef.current();
         if (window.electronAPI.unregisterF2Hotkey) {
-          window.electronAPI.unregisterF2Hotkey().catch(console.error);
+          window.electronAPI.unregisterF2Hotkey().catch((error) => {
+            if (window.electronAPI && window.electronAPI.log) {
+              window.electronAPI.log('error', 'F2热键注销失败:', error);
+            }
+          });
         }
         f2RegisteredRef.current = false;
         setIsF2Registered(false);
@@ -116,7 +136,9 @@ export const useHotkey = (onF2DoubleClick) => {
       }
       return false;
     } catch (error) {
-      console.error('注册热键失败:', error);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('error', '注册热键失败:', error);
+      }
       return false;
     }
   };
@@ -131,7 +153,9 @@ export const useHotkey = (onF2DoubleClick) => {
         }
       }
     } catch (error) {
-      console.error('注销热键失败:', error);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('error', '注销热键失败:', error);
+      }
     }
   };
 
@@ -142,7 +166,9 @@ export const useHotkey = (onF2DoubleClick) => {
         await window.electronAPI.setRecordingState(isRecording);
       }
     } catch (error) {
-      console.error('同步录音状态失败:', error);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('error', '同步录音状态失败:', error);
+      }
     }
   }, []);
 

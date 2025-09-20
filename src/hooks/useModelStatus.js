@@ -35,7 +35,9 @@ export const useModelStatus = () => {
         }
       }
     } catch (error) {
-      console.error('检查模型状态失败:', error);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('error', '检查模型状态失败:', error);
+      }
       setModelStatus({
         isLoading: false,
         isReady: false,

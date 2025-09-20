@@ -5,8 +5,9 @@ const os = require("os");
 const { runCommand, TIMEOUTS } = require("../utils/process");
 
 class PythonInstaller {
-  constructor() {
+  constructor(logger = null) {
     this.pythonVersion = "3.11.9"; // 与FunASR兼容的稳定版本
+    this.logger = logger;
   }
 
   async downloadFile(url, outputPath, progressCallback = null) {
@@ -62,7 +63,9 @@ class PythonInstaller {
       // 首先尝试使用 Homebrew（推荐方式）
       try {
         await runCommand("brew", ["--version"], { timeout: TIMEOUTS.QUICK_CHECK });
-        console.log("通过 Homebrew 安装 Python...");
+        if (this.logger && this.logger.info) {
+          this.logger.info("通过 Homebrew 安装 Python...");
+        }
         
         if (progressCallback) {
           progressCallback({ stage: "通过 Homebrew 安装 Python...", percentage: 25 });
@@ -77,7 +80,9 @@ class PythonInstaller {
         return { success: true, method: "homebrew" };
         
       } catch (brewError) {
-        console.log("Homebrew 不可用，使用官方安装包...");
+        if (this.logger && this.logger.info) {
+          this.logger.info("Homebrew 不可用，使用官方安装包...");
+        }
         
         if (progressCallback) {
           progressCallback({ stage: "下载 Python 安装包...", percentage: 10 });

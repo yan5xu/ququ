@@ -1,12 +1,13 @@
 const { globalShortcut } = require('electron');
 
 class HotkeyManager {
-  constructor() {
+  constructor(logger = null) {
     this.registeredHotkeys = new Map();
     this.f2ClickTimes = [];
     this.f2DoubleClickTimeout = 500; // 500ms内的两次点击算作双击
     this.onF2DoubleClick = null;
     this.isRecording = false;
+    this.logger = logger;
   }
 
   /**
@@ -16,7 +17,9 @@ class HotkeyManager {
   registerF2DoubleClick(callback) {
     // 如果已经注册了F2，只更新回调函数，不重新注册
     if (this.registeredHotkeys.has('F2')) {
-      console.log('F2热键已注册，更新回调函数');
+      if (this.logger && this.logger.info) {
+        this.logger.info('F2热键已注册，更新回调函数');
+      }
       this.onF2DoubleClick = callback;
       return true;
     }
@@ -29,11 +32,15 @@ class HotkeyManager {
     });
 
     if (success) {
-      console.log('F2热键首次注册成功');
+      if (this.logger && this.logger.info) {
+        this.logger.info('F2热键首次注册成功');
+      }
       this.registeredHotkeys.set('F2', callback);
       return true;
     } else {
-      console.error('F2热键注册失败');
+      if (this.logger && this.logger.error) {
+        this.logger.error('F2热键注册失败');
+      }
       return false;
     }
   }
@@ -52,7 +59,9 @@ class HotkeyManager {
 
     // 检查是否为双击
     if (this.f2ClickTimes.length >= 2) {
-      console.log('检测到F2双击');
+      if (this.logger && this.logger.info) {
+        this.logger.info('检测到F2双击');
+      }
       this.handleF2DoubleClick();
       this.f2ClickTimes = []; // 清空点击记录
     }
@@ -65,7 +74,9 @@ class HotkeyManager {
     if (this.onF2DoubleClick) {
       // 根据当前状态决定动作
       const action = this.isRecording ? 'stop' : 'start';
-      console.log(`F2双击 - ${action === 'start' ? '开始' : '停止'}录音，当前状态: ${this.isRecording}`);
+      if (this.logger && this.logger.info) {
+        this.logger.info(`F2双击 - ${action === 'start' ? '开始' : '停止'}录音，当前状态: ${this.isRecording}`);
+      }
       
       this.onF2DoubleClick({
         action: action,
@@ -90,11 +101,15 @@ class HotkeyManager {
     const success = globalShortcut.register(hotkey, callback);
     
     if (success) {
-      console.log(`热键 ${hotkey} 注册成功`);
+      if (this.logger && this.logger.info) {
+        this.logger.info(`热键 ${hotkey} 注册成功`);
+      }
       this.registeredHotkeys.set(hotkey, callback);
       return true;
     } else {
-      console.error(`热键 ${hotkey} 注册失败`);
+      if (this.logger && this.logger.error) {
+        this.logger.error(`热键 ${hotkey} 注册失败`);
+      }
       return false;
     }
   }
@@ -107,7 +122,9 @@ class HotkeyManager {
     if (this.registeredHotkeys.has(hotkey)) {
       globalShortcut.unregister(hotkey);
       this.registeredHotkeys.delete(hotkey);
-      console.log(`热键 ${hotkey} 已注销`);
+      if (this.logger && this.logger.info) {
+        this.logger.info(`热键 ${hotkey} 已注销`);
+      }
       return true;
     }
     return false;
@@ -120,7 +137,9 @@ class HotkeyManager {
     globalShortcut.unregisterAll();
     this.registeredHotkeys.clear();
     this.f2ClickTimes = [];
-    console.log('所有热键已注销');
+    if (this.logger && this.logger.info) {
+      this.logger.info('所有热键已注销');
+    }
   }
 
   /**

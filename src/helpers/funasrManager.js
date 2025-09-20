@@ -313,7 +313,7 @@ class FunASRManager {
       }
       
     } catch (error) {
-      console.error("Python 安装失败:", error);
+      this.logger.error && this.logger.error("Python 安装失败:", error);
       throw error;
     }
   }
@@ -383,13 +383,13 @@ class FunASRManager {
     try {
       await this.upgradePip(pythonCmd);
     } catch (error) {
-      console.log("第一次 pip 升级尝试失败:", error.message);
+      this.logger.warn && this.logger.warn("第一次 pip 升级尝试失败:", error.message);
       
       // 尝试用户安装方式升级 pip
       try {
         await runCommand(pythonCmd, ["-m", "pip", "install", "--user", "--upgrade", "pip"], { timeout: TIMEOUTS.PIP_UPGRADE });
       } catch (userError) {
-        console.log("pip 升级完全失败，尝试继续");
+        this.logger.warn && this.logger.warn("pip 升级完全失败，尝试继续");
       }
     }
     
@@ -457,7 +457,7 @@ class FunASRManager {
 
     // 如果服务器还未就绪，等待初始化完成
     if (!this.serverReady && this.initializationPromise) {
-      console.log('等待FunASR服务器就绪...');
+      this.logger.info && this.logger.info('等待FunASR服务器就绪...');
       await this.initializationPromise;
     }
 
@@ -469,7 +469,7 @@ class FunASRManager {
       }
       
       // 使用服务器模式
-      console.log('使用FunASR服务器模式进行转录');
+      this.logger.info && this.logger.info('使用FunASR服务器模式进行转录');
       const result = await this._sendServerCommand({
         action: 'transcribe',
         audio_path: tempAudioPath,
@@ -499,7 +499,7 @@ class FunASRManager {
     const filename = `funasr_audio_${crypto.randomUUID()}.wav`;
     const tempAudioPath = path.join(tempDir, filename);
     
-    console.log('创建临时文件:', tempAudioPath);
+    this.logger.info && this.logger.info('创建临时文件:', tempAudioPath);
 
     let buffer;
     if (audioBlob instanceof ArrayBuffer) {
@@ -514,13 +514,13 @@ class FunASRManager {
       throw new Error(`不支持的音频数据类型: ${typeof audioBlob}`);
     }
     
-    console.log('缓冲区创建，大小:', buffer.length);
+    this.logger.debug && this.logger.debug('缓冲区创建，大小:', buffer.length);
 
     await fs.promises.writeFile(tempAudioPath, buffer);
     
     // 验证文件是否正确写入
     const stats = await fs.promises.stat(tempAudioPath);
-    console.log('临时音频文件创建:', {
+    this.logger.info && this.logger.info('临时音频文件创建:', {
       path: tempAudioPath,
       size: stats.size,
       isFile: stats.isFile()

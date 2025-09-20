@@ -2,11 +2,12 @@ const { Tray, Menu, nativeImage } = require("electron");
 const path = require("path");
 
 class TrayManager {
-  constructor() {
+  constructor(logger = null) {
     this.tray = null;
     this.mainWindow = null;
     this.controlPanelWindow = null;
     this.createControlPanelCallback = null;
+    this.logger = logger;
   }
 
   setWindows(mainWindow, controlPanelWindow) {
@@ -58,7 +59,9 @@ class TrayManager {
       });
 
     } catch (error) {
-      console.error("创建托盘失败:", error);
+      if (this.logger && this.logger.error) {
+        this.logger.error("创建托盘失败:", error);
+      }
     }
   }
 

@@ -153,10 +153,14 @@ export const useRecording = () => {
           // 使用setTimeout确保界面先更新
           setTimeout(async () => {
             try {
-              console.log('开始AI优化，原始文本:', result.text);
+              if (window.electronAPI && window.electronAPI.log) {
+                window.electronAPI.log('info', '开始AI优化，原始文本:', result.text);
+              }
               // 调用AI进行内容优化（不包括标点恢复）
               const enhanced = await processText(result.text, 'optimize');
-              console.log('AI优化结果:', enhanced);
+              if (window.electronAPI && window.electronAPI.log) {
+                window.electronAPI.log('info', 'AI优化结果:', enhanced);
+              }
 
               if (enhanced) {
                 // AI优化完成，更新界面（即使结果与原文相同也显示）
@@ -167,7 +171,9 @@ export const useRecording = () => {
                   enhanced_by_ai: true
                 };
 
-                console.log('准备触发AI优化完成事件:', enhancedResult);
+                if (window.electronAPI && window.electronAPI.log) {
+                  window.electronAPI.log('info', '准备触发AI优化完成事件:', enhancedResult);
+                }
 
                 // 保存转录结果（包含原始文本、FunASR标点恢复文本和AI优化后的文本）
                 const transcriptionData = {
@@ -186,16 +192,24 @@ export const useRecording = () => {
 
                 // 触发AI优化完成事件
                 if (window.onAIOptimizationComplete) {
-                  console.log('触发AI优化完成事件');
+                  if (window.electronAPI && window.electronAPI.log) {
+                    window.electronAPI.log('info', '触发AI优化完成事件');
+                  }
                   window.onAIOptimizationComplete(enhancedResult);
                 } else {
-                  console.error('window.onAIOptimizationComplete 回调函数不存在');
+                  if (window.electronAPI && window.electronAPI.log) {
+                    window.electronAPI.log('error', 'window.onAIOptimizationComplete 回调函数不存在');
+                  }
                 }
               } else {
-                console.log('AI优化结果为空，不更新界面');
+                if (window.electronAPI && window.electronAPI.log) {
+                  window.electronAPI.log('info', 'AI优化结果为空，不更新界面');
+                }
               }
             } catch (optimizeError) {
-              console.warn('AI内容优化失败，保持FunASR处理结果:', optimizeError);
+              if (window.electronAPI && window.electronAPI.log) {
+                window.electronAPI.log('warn', 'AI内容优化失败，保持FunASR处理结果:', optimizeError);
+              }
 
               // 保存FunASR处理结果
               const transcriptionData = {
@@ -222,7 +236,9 @@ export const useRecording = () => {
         }
       } else {
         // Web环境下的模拟处理
-        console.warn('Electron API不可用，使用模拟数据');
+        if (window.electronAPI && window.electronAPI.log) {
+          window.electronAPI.log('warn', 'Electron API不可用，使用模拟数据');
+        }
         const mockResult = {
           success: true,
           text: '这是模拟的语音识别结果，用于测试界面功能。',
@@ -350,7 +366,9 @@ export const useRecording = () => {
       const result = await navigator.permissions.query({ name: 'microphone' });
       return result.state; // 'granted', 'denied', 'prompt'
     } catch (err) {
-      console.warn('无法检查麦克风权限:', err);
+      if (window.electronAPI && window.electronAPI.log) {
+        window.electronAPI.log('warn', '无法检查麦克风权限:', err);
+      }
       return 'unknown';
     }
   }, []);
