@@ -100,8 +100,8 @@
     "unzipper": "^0.12.3"
   },
   "build": {
-    "appId": "com.chinesewhispr.app",
-    "productName": "ChineseWhispr",
+    "appId": "com.ququ.app",
+    "productName": "蛐蛐",
     "directories": {
       "output": "dist"
     },

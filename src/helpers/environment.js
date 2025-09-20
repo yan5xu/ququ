@@ -100,7 +100,7 @@ class EnvironmentManager {
   }
 
   getDataDirectory() {
-    const appName = "ChineseWhispr";
+    const appName = "蛐蛐";
     
     switch (process.platform) {
       case "win32":
