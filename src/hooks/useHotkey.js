@@ -4,20 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * 热键管理Hook
  * 处理全局快捷键功能，包括F2双击功能
  */
-export const useHotkey = (onF2DoubleClick) => {
+export const useHotkey = () => {
   const [hotkey, setHotkey] = useState('CommandOrControl+Shift+Space');
   const [isRegistered, setIsRegistered] = useState(false);
-  const [isF2Registered, setIsF2Registered] = useState(false);
-  
-  // 使用ref来避免重复注册
-  const f2CallbackRef = useRef(onF2DoubleClick);
-  const f2RegisteredRef = useRef(false);
-  const f2ListenerRef = useRef(null);
-
-  // 更新回调函数引用
-  useEffect(() => {
-    f2CallbackRef.current = onF2DoubleClick;
-  }, [onF2DoubleClick]);
+  const registeredHotkeyRef = useRef(null); // 跟踪已注册的热键
 
   // 获取当前热键
   useEffect(() => {
@@ -39,96 +29,21 @@ export const useHotkey = (onF2DoubleClick) => {
     getCurrentHotkey();
   }, []);
 
-  // 注册F2双击监听 - 只注册一次，且只在主窗口注册
-  useEffect(() => {
-    // 防止重复注册的多重检查
-    if (!window.electronAPI || !onF2DoubleClick || f2RegisteredRef.current) {
-      return;
-    }
+  // 移除F2双击相关的复杂逻辑，专注于传统热键
 
-    // 检查是否为主窗口（通过URL参数判断）
-    const urlParams = new URLSearchParams(window.location.search);
-    const isControlPanel = urlParams.get('panel') === 'control';
-    
-    // 只有主窗口才注册F2热键
-    if (isControlPanel) {
-      if (window.electronAPI && window.electronAPI.log) {
-        window.electronAPI.log('info', '控制面板窗口，跳过F2热键注册');
-      }
-      return;
-    }
-
-    if (window.electronAPI && window.electronAPI.log) {
-      window.electronAPI.log('info', '主窗口首次注册F2双击监听器');
-    }
-    
-    let isComponentMounted = true; // 用于检查组件是否仍然挂载
-    
-    // 注册F2热键
-    const registerF2 = async () => {
-      try {
-        const result = await window.electronAPI.registerF2Hotkey();
-        if (result.success && isComponentMounted) {
-          f2RegisteredRef.current = true;
-          setIsF2Registered(true);
-          if (window.electronAPI && window.electronAPI.log) {
-            window.electronAPI.log('info', 'F2热键注册成功');
-          }
-        } else if (isComponentMounted) {
-          if (window.electronAPI && window.electronAPI.log) {
-            window.electronAPI.log('error', 'F2热键注册失败:', result.error);
-          }
-        }
-      } catch (error) {
-        if (isComponentMounted) {
-          if (window.electronAPI && window.electronAPI.log) {
-            window.electronAPI.log('error', 'F2热键注册异常:', error);
-          }
-        }
-      }
-    };
-
-    // 监听F2双击事件
-    const removeF2Listener = window.electronAPI.onF2DoubleClick((event, data) => {
-      if (window.electronAPI && window.electronAPI.log) {
-        window.electronAPI.log('info', '收到F2双击事件:', data);
-      }
-      if (f2CallbackRef.current && isComponentMounted) {
-        f2CallbackRef.current(data);
-      }
-    });
-
-    f2ListenerRef.current = removeF2Listener;
-    registerF2();
-
-    // 组件卸载时清理
-    return () => {
-      isComponentMounted = false;
-      
-      if (f2RegisteredRef.current && f2ListenerRef.current) {
-        if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('info', '组件卸载，清理F2双击监听器');
-        }
-        f2ListenerRef.current();
-        if (window.electronAPI.unregisterF2Hotkey) {
-          window.electronAPI.unregisterF2Hotkey().catch((error) => {
-            if (window.electronAPI && window.electronAPI.log) {
-              window.electronAPI.log('error', 'F2热键注销失败:', error);
-            }
-          });
-        }
-        f2RegisteredRef.current = false;
-        setIsF2Registered(false);
-      }
-    };
-  }, []); // 空依赖数组，只在组件挂载时执行一次
-
-  // 注册传统热键
+  // 注册传统热键 - 添加防重复注册机制
   const registerHotkey = async (newHotkey) => {
     try {
+      // 防重复注册：如果已经注册了相同的热键，直接返回成功
+      if (registeredHotkeyRef.current === newHotkey && isRegistered) {
+        console.log(`热键 ${newHotkey} 已注册，跳过重复注册`);
+        return true;
+      }
+
       if (window.electronAPI) {
         const result = await window.electronAPI.registerHotkey(newHotkey);
         if (result.success) {
+          registeredHotkeyRef.current = newHotkey;
           setHotkey(newHotkey);
           setIsRegistered(true);
           return true;
@@ -187,7 +102,6 @@ export const useHotkey = (onF2DoubleClick) => {
     hotkey: formatHotkey(hotkey),
     rawHotkey: hotkey,
     isRegistered,
-    isF2Registered,
     registerHotkey,
     unregisterHotkey,
     syncRecordingState

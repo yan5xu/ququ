@@ -400,24 +400,39 @@ export default function App() {
     }
   }, [modelStatus.isReady, modelStatus.isLoading, modelStatus.error, isRecording, isRecordingProcessing, startRecording, stopRecording]);
 
-  // 处理F2双击事件 - 使用useRef避免依赖变化
-  const handleF2DoubleClick = useCallback((data) => {
-    console.log('收到F2双击事件:', data);
-    
-    // 直接调用toggleRecording，让它处理状态检查
-    if (data.action === 'start') {
-      console.log('F2双击 - 尝试开始录音');
-      toast.info("🎤 F2双击 - 开始录音");
-      toggleRecording();
-    } else if (data.action === 'stop') {
-      console.log('F2双击 - 尝试停止录音');
-      toast.info("⏹️ F2双击 - 停止录音");
-      toggleRecording();
-    }
-  }, [toggleRecording]);
+  // 使用热键Hook，不再使用F2双击功能
+  const { hotkey, syncRecordingState, registerHotkey } = useHotkey();
 
-  // 使用热键Hook，传入F2双击处理函数
-  const { hotkey, isF2Registered, syncRecordingState } = useHotkey(handleF2DoubleClick);
+  // 注册传统热键监听 - 只在主窗口注册，避免重复
+  useEffect(() => {
+    // 检查是否为控制面板窗口
+    const urlParams = new URLSearchParams(window.location.search);
+    const isControlPanel = urlParams.get('panel') === 'control';
+    
+    // 只有主窗口才注册热键
+    if (isControlPanel) {
+      console.log('控制面板窗口，跳过热键注册');
+      return;
+    }
+
+    const initializeHotkey = async () => {
+      try {
+        // 注册默认热键 CommandOrControl+Shift+Space
+        const success = await registerHotkey('CommandOrControl+Shift+Space');
+        if (success) {
+          console.log('主窗口热键注册成功');
+        } else {
+          console.error('主窗口热键注册失败');
+        }
+      } catch (error) {
+        console.error('主窗口热键注册异常:', error);
+      }
+    };
+
+    if (registerHotkey) {
+      initializeHotkey();
+    }
+  }, [registerHotkey]);
 
   // 处理关闭窗口
   const handleClose = () => {
@@ -444,15 +459,29 @@ export default function App() {
   };
 
 
-  // 监听全局热键
+  // 监听全局热键触发事件
   useEffect(() => {
     if (window.electronAPI) {
-      const unsubscribe = window.electronAPI.onToggleDictation(() => {
+      // 监听传统热键触发
+      const unsubscribeHotkey = window.electronAPI.onHotkeyTriggered((event, data) => {
+        console.log('收到热键触发事件:', data);
+        console.log('当前录音状态:', isRecording, '处理状态:', isRecordingProcessing);
         toggleRecording();
       });
-      return unsubscribe;
+
+      // 监听旧的toggle事件（保持兼容性）
+      const unsubscribeToggle = window.electronAPI.onToggleDictation(() => {
+        console.log('收到旧版toggle事件');
+        console.log('当前录音状态:', isRecording, '处理状态:', isRecordingProcessing);
+        toggleRecording();
+      });
+
+      return () => {
+        if (unsubscribeHotkey) unsubscribeHotkey();
+        if (unsubscribeToggle) unsubscribeToggle();
+      };
     }
-  }, [toggleRecording]);
+  }, [toggleRecording, isRecording, isRecordingProcessing]);
 
   // 同步录音状态到热键管理器
   useEffect(() => {
@@ -638,7 +667,7 @@ export default function App() {
             ) : micState === "optimizing" ? (
               "AI正在优化文本，请稍候..."
             ) : (
-              `点击麦克风、按 ${hotkey} 或双击F2开始录音`
+              `点击麦克风或按 ${hotkey} 开始录音`
             )}
           </p>
         </div>

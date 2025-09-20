@@ -16,6 +16,9 @@ export const useRecording = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
+  
+  // 添加防重复处理机制
+  const processingRef = useRef({ isProcessingAudio: false, lastProcessTime: 0 });
 
   // 使用文本处理Hook和模型状态Hook
   const { processText } = useTextProcessing();
@@ -122,6 +125,9 @@ export const useRecording = () => {
 
   // 处理音频
   const processAudio = useCallback(async (audioBlob) => {
+    // 设置处理状态，防止重复处理
+    processingRef.current.isProcessingAudio = true;
+    
     try {
       // 转换音频格式为WAV（FunASR需要）
       const wavBlob = await convertToWav(audioBlob);
@@ -254,6 +260,9 @@ export const useRecording = () => {
       }
     } catch (err) {
       throw new Error(`音频处理失败: ${err.message}`);
+    } finally {
+      // 重置处理状态
+      processingRef.current.isProcessingAudio = false;
     }
   }, []);
 

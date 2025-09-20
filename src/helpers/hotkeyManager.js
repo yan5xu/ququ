@@ -8,6 +8,10 @@ class HotkeyManager {
     this.onF2DoubleClick = null;
     this.isRecording = false;
     this.logger = logger;
+    
+    // 简化的热键防抖机制
+    this.lastHotkeyTrigger = new Map();
+    this.hotkeyDebounceTime = 200; // 200ms防抖时间，防止意外双击
   }
 
   /**
@@ -93,18 +97,35 @@ class HotkeyManager {
    * @param {Function} callback - 回调函数
    */
   registerHotkey(hotkey, callback) {
-    // 先注销已存在的热键
+    // 检查是否已经注册了相同的热键
     if (this.registeredHotkeys.has(hotkey)) {
-      this.unregisterHotkey(hotkey);
+      if (this.logger && this.logger.info) {
+        this.logger.info(`热键 ${hotkey} 已注册，跳过重复注册`);
+      }
+      return true; // 返回成功，因为热键已经注册
     }
 
-    const success = globalShortcut.register(hotkey, callback);
+    // 创建带简单防抖的回调函数
+    const debouncedCallback = () => {
+      const now = Date.now();
+      const lastTrigger = this.lastHotkeyTrigger.get(hotkey) || 0;
+      
+      // 简单防抖：防止意外的快速重复触发
+      if (now - lastTrigger < this.hotkeyDebounceTime) {
+        return;
+      }
+      
+      this.lastHotkeyTrigger.set(hotkey, now);
+      callback();
+    };
+
+    const success = globalShortcut.register(hotkey, debouncedCallback);
     
     if (success) {
       if (this.logger && this.logger.info) {
         this.logger.info(`热键 ${hotkey} 注册成功`);
       }
-      this.registeredHotkeys.set(hotkey, callback);
+      this.registeredHotkeys.set(hotkey, debouncedCallback);
       return true;
     } else {
       if (this.logger && this.logger.error) {

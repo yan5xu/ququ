@@ -157,6 +157,28 @@ class IPCHandlers {
       return this.clipboardManager.pasteText(text);
     });
 
+    ipcMain.handle("insert-text-directly", async (event, text) => {
+      try {
+        return await this.clipboardManager.insertTextDirectly(text);
+      } catch (error) {
+        this.logger.error("直接插入文本失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("enable-macos-accessibility", async () => {
+      try {
+        if (process.platform === "darwin") {
+          const result = await this.clipboardManager.enableMacOSAccessibility();
+          return { success: result };
+        }
+        return { success: true, message: "非 macOS 平台，无需设置" };
+      } catch (error) {
+        this.logger.error("启用 macOS accessibility 失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
     ipcMain.handle("read-clipboard", async () => {
       try {
         const text = await this.clipboardManager.readClipboard();
@@ -269,14 +291,43 @@ class IPCHandlers {
       require("electron").app.quit();
     });
 
-    // 热键管理
+    // 热键管理 - 添加发送者跟踪机制
+    this.hotkeyRegisteredSenders = new Set(); // 跟踪已注册热键的发送者
+    
     ipcMain.handle("register-hotkey", (event, hotkey) => {
       try {
         if (this.hotkeyManager) {
+          const senderId = event.sender.id;
+          
+          // 检查是否已经为这个发送者注册过热键
+          if (this.hotkeyRegisteredSenders.has(senderId)) {
+            this.logger.info(`发送者 ${senderId} 已注册过热键，跳过重复注册`);
+            return { success: true };
+          }
+          
           const success = this.hotkeyManager.registerHotkey(hotkey, () => {
-            // 发送热键触发事件到渲染进程
-            event.sender.send("hotkey-triggered", { hotkey });
+            // 只发送热键触发事件到主窗口，避免重复触发
+            this.logger.info(`热键 ${hotkey} 被触发，发送事件到主窗口`);
+            if (this.windowManager && this.windowManager.mainWindow && !this.windowManager.mainWindow.isDestroyed()) {
+              this.windowManager.mainWindow.webContents.send("hotkey-triggered", { hotkey });
+            }
           });
+          
+          if (success) {
+            // 添加发送者到跟踪列表
+            this.hotkeyRegisteredSenders.add(senderId);
+            
+            // 监听窗口关闭事件，清理注册记录
+            event.sender.on('destroyed', () => {
+              this.hotkeyRegisteredSenders.delete(senderId);
+              this.logger.info(`清理发送者 ${senderId} 的热键注册记录`);
+            });
+            
+            this.logger.info(`热键 ${hotkey} 注册成功，发送者: ${senderId}`);
+          } else {
+            this.logger.error(`热键 ${hotkey} 注册失败`);
+          }
+          
           return { success };
         }
         return { success: false, error: "热键管理器未初始化" };

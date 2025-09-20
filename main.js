@@ -116,7 +116,7 @@ logger.info('设置用户数据目录环境变量', {
 const environmentManager = new EnvironmentManager();
 const windowManager = new WindowManager();
 const databaseManager = new DatabaseManager();
-const clipboardManager = new ClipboardManager();
+const clipboardManager = new ClipboardManager(logger); // 传递logger实例
 const funasrManager = new FunASRManager(logger); // 传递logger实例
 const trayManager = new TrayManager();
 const hotkeyManager = new HotkeyManager();
@@ -145,6 +145,14 @@ async function startApp() {
     electronVersion: process.versions.electron,
     appVersion: app.getVersion()
   });
+
+  // 注释掉 accessibility 支持 - 可能干扰文本插入
+  // try {
+  //   app.setAccessibilitySupportEnabled(true);
+  //   logger.info('✅ 已启用 Electron accessibility 支持');
+  // } catch (error) {
+  //   logger.warn('⚠️ 启用 accessibility 支持失败:', error.message);
+  // }
 
   // 记录系统信息
   logger.info('系统信息', logger.getSystemInfo());
