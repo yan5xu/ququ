@@ -11,6 +11,9 @@ import { usePermissions } from "./hooks/usePermissions";
 import { Mic, MicOff, Settings, History, Copy, Download } from "lucide-react";
 import SettingsPanel from "./components/SettingsPanel";
 
+// 动态导入设置页面组件
+const SettingsPage = React.lazy(() => import('./settings.jsx').then(module => ({ default: module.SettingsPage })));
+
 // 声波图标组件（空闲/悬停状态）
 const SoundWaveIcon = ({ size = 16, isActive = false }) => {
   return (
@@ -174,6 +177,26 @@ const TextDisplay = ({ originalText, processedText, isProcessing, onCopy, onExpo
 };
 
 export default function App() {
+  // 检查URL参数来决定渲染哪个页面
+  const urlParams = new URLSearchParams(window.location.search);
+  const page = urlParams.get('page');
+  
+  // 如果是设置页面，直接渲染设置组件
+  if (page === 'settings') {
+    return (
+      <React.Suspense fallback={
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
+          <div className="flex items-center space-x-3">
+            <LoadingDots />
+            <span className="text-gray-700 dark:text-gray-300">加载设置页面...</span>
+          </div>
+        </div>
+      }>
+        <SettingsPage />
+      </React.Suspense>
+    );
+  }
+
   const [isHovered, setIsHovered] = useState(false);
   const [originalText, setOriginalText] = useState("");
   const [processedText, setProcessedText] = useState("");
@@ -405,7 +428,12 @@ export default function App() {
 
   // 处理打开设置
   const handleOpenSettings = () => {
-    setShowSettings(true);
+    if (window.electronAPI) {
+      window.electronAPI.openSettingsWindow();
+    } else {
+      // Web环境下仍然使用模态框
+      setShowSettings(true);
+    }
   };
 
   // 处理打开历史记录

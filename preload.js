@@ -23,7 +23,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // AI文本处理
   processText: (text, mode) => ipcRenderer.invoke("process-text", text, mode),
-  checkAIStatus: () => ipcRenderer.invoke("check-ai-status"),
+  checkAIStatus: (testConfig) => ipcRenderer.invoke("check-ai-status", testConfig),
 
   // 剪贴板操作
   pasteText: (text) => ipcRenderer.invoke("paste-text", text),
@@ -43,6 +43,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // 设置管理
   getSettings: () => ipcRenderer.invoke("get-settings"),
+  getAllSettings: () => ipcRenderer.invoke("get-all-settings"),
+  getSetting: (key, defaultValue) => ipcRenderer.invoke("get-setting", key, defaultValue),
+  setSetting: (key, value) => ipcRenderer.invoke("set-setting", key, value),
   saveSetting: (key, value) => ipcRenderer.invoke("save-setting", key, value),
   resetSettings: () => ipcRenderer.invoke("reset-settings"),
 
@@ -115,6 +118,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openHistoryWindow: () => ipcRenderer.invoke("open-history-window"),
   closeHistoryWindow: () => ipcRenderer.invoke("close-history-window"),
   hideHistoryWindow: () => ipcRenderer.invoke("hide-history-window"),
+
+  // 设置窗口相关
+  openSettingsWindow: () => ipcRenderer.invoke("open-settings-window"),
+  closeSettingsWindow: () => ipcRenderer.invoke("close-settings-window"),
+  hideSettingsWindow: () => ipcRenderer.invoke("hide-settings-window"),
 
   // 中文特定功能
   detectLanguage: (text) => ipcRenderer.invoke("detect-language", text),

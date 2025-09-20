@@ -6,6 +6,7 @@ class WindowManager {
     this.mainWindow = null;
     this.controlPanelWindow = null;
     this.historyWindow = null;
+    this.settingsWindow = null;
   }
 
   async createMainWindow() {
@@ -115,6 +116,41 @@ class WindowManager {
     return this.historyWindow;
   }
 
+  async createSettingsWindow() {
+    if (this.settingsWindow) {
+      this.settingsWindow.focus();
+      return this.settingsWindow;
+    }
+
+    this.settingsWindow = new BrowserWindow({
+      width: 700,
+      height: 600,
+      show: false,
+      title: "设置 - 蛐蛐",
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, "..", "..", "preload.js"),
+      },
+    });
+
+    const isDev = process.env.NODE_ENV === "development";
+    
+    if (isDev) {
+      await this.settingsWindow.loadURL("http://localhost:5173?page=settings");
+    } else {
+      await this.settingsWindow.loadFile(
+        path.join(__dirname, "..", "dist", "settings.html")
+      );
+    }
+
+    this.settingsWindow.on("closed", () => {
+      this.settingsWindow = null;
+    });
+
+    return this.settingsWindow;
+  }
+
   showControlPanel() {
     if (this.controlPanelWindow) {
       this.controlPanelWindow.show();
@@ -155,6 +191,29 @@ class WindowManager {
     }
   }
 
+  showSettingsWindow() {
+    if (this.settingsWindow) {
+      this.settingsWindow.show();
+      this.settingsWindow.focus();
+    } else {
+      this.createSettingsWindow().then(() => {
+        this.settingsWindow.show();
+      });
+    }
+  }
+
+  hideSettingsWindow() {
+    if (this.settingsWindow) {
+      this.settingsWindow.hide();
+    }
+  }
+
+  closeSettingsWindow() {
+    if (this.settingsWindow) {
+      this.settingsWindow.close();
+    }
+  }
+
   closeAllWindows() {
     if (this.mainWindow) {
       this.mainWindow.close();
@@ -164,6 +223,9 @@ class WindowManager {
     }
     if (this.historyWindow) {
       this.historyWindow.close();
+    }
+    if (this.settingsWindow) {
+      this.settingsWindow.close();
     }
   }
 }

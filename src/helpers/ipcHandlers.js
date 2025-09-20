@@ -79,8 +79,8 @@ class IPCHandlers {
       return await this.processTextWithAI(text, mode);
     });
 
-    ipcMain.handle("check-ai-status", async () => {
-      return await this.checkAIStatus();
+    ipcMain.handle("check-ai-status", async (event, testConfig = null) => {
+      return await this.checkAIStatus(testConfig);
     });
 
     // 音频转录相关
@@ -247,6 +247,21 @@ class IPCHandlers {
 
     ipcMain.handle("hide-history-window", () => {
       this.windowManager.hideHistoryWindow();
+      return true;
+    });
+
+    ipcMain.handle("open-settings-window", () => {
+      this.windowManager.showSettingsWindow();
+      return true;
+    });
+
+    ipcMain.handle("close-settings-window", () => {
+      this.windowManager.closeSettingsWindow();
+      return true;
+    });
+
+    ipcMain.handle("hide-settings-window", () => {
+      this.windowManager.hideSettingsWindow();
       return true;
     });
 
@@ -809,12 +824,12 @@ class IPCHandlers {
   // AI文本处理方法
   async processTextWithAI(text, mode = 'optimize') {
     try {
-      // 从环境变量或设置中获取API密钥
-      const apiKey = process.env.AI_API_KEY || await this.databaseManager.getSetting('ai_api_key');
+      // 优先从数据库设置中获取API密钥，然后才是环境变量
+      const apiKey = await this.databaseManager.getSetting('ai_api_key') || process.env.AI_API_KEY;
       if (!apiKey) {
         return {
           success: false,
-          error: '请先配置AI API密钥'
+          error: '请先在设置页面配置AI API密钥'
         };
       }
 
@@ -866,8 +881,8 @@ ${text}
 请直接返回优化后的文本，不需要解释过程。`
       };
 
-      const baseUrl = process.env.AI_BASE_URL || await this.databaseManager.getSetting('ai_base_url') || 'https://api.openai.com/v1';
-      const model = process.env.AI_MODEL || await this.databaseManager.getSetting('ai_model') || 'gpt-3.5-turbo';
+      const baseUrl = await this.databaseManager.getSetting('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
+      const model = await this.databaseManager.getSetting('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
 
       const requestData = {
         model: model,
@@ -971,60 +986,134 @@ ${text}
   }
 
   // 检查AI状态
-  async checkAIStatus() {
+  async checkAIStatus(testConfig = null) {
     try {
-      const apiKey = process.env.AI_API_KEY || await this.databaseManager.getSetting('ai_api_key');
+      this.logger.info('开始测试AI配置...', testConfig ? '使用临时配置' : '使用已保存配置');
+      
+      // 如果提供了测试配置，使用测试配置；否则使用已保存的配置
+      let apiKey, baseUrl, model;
+      
+      if (testConfig) {
+        apiKey = testConfig.ai_api_key;
+        baseUrl = testConfig.ai_base_url || 'https://api.openai.com/v1';
+        model = testConfig.ai_model || 'gpt-3.5-turbo';
+        this.logger.info('使用临时测试配置:', { baseUrl, model, apiKeyLength: apiKey?.length || 0 });
+      } else {
+        apiKey = await this.databaseManager.getSetting('ai_api_key') || process.env.AI_API_KEY;
+        baseUrl = await this.databaseManager.getSetting('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
+        model = await this.databaseManager.getSetting('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+        this.logger.info('使用已保存配置:', { baseUrl, model, apiKeyLength: apiKey?.length || 0 });
+      }
+      
       if (!apiKey) {
+        this.logger.warn('AI测试失败: 未配置API密钥');
         return {
           available: false,
-          error: '未配置API密钥'
+          error: '未配置API密钥',
+          details: '请输入AI API密钥'
         };
       }
-
-      const baseUrl = process.env.AI_BASE_URL || await this.databaseManager.getSetting('ai_base_url') || 'https://api.openai.com/v1';
-      const model = process.env.AI_MODEL || await this.databaseManager.getSetting('ai_model') || 'gpt-3.5-turbo';
       
-      // 发送一个简单的测试请求
+      this.logger.info('AI配置信息:', {
+        baseUrl: baseUrl,
+        model: model,
+        apiKeyLength: apiKey.length
+      });
+      
+      // 发送一个更有意义的测试请求
+      const testMessage = '请回复"测试成功"来确认AI服务正常工作';
+      const requestData = {
+        model: model,
+        messages: [
+          {
+            role: 'user',
+            content: testMessage
+          }
+        ],
+        max_tokens: 50,
+        temperature: 0.1
+      };
+
+      this.logger.info('发送AI测试请求:', requestData);
+
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            {
-              role: 'user',
-              content: '测试'
-            }
-          ],
-          max_tokens: 10
-        })
+        body: JSON.stringify(requestData)
       });
+
+      this.logger.info('AI API响应状态:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
+        this.logger.error('AI API错误响应:', errorText);
+        
         let errorData = { error: response.statusText };
         try {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { error: errorText || response.statusText };
         }
-        throw new Error(errorData.error?.message || errorData.error || `API error: ${response.status}`);
+        
+        let errorMessage = errorData.error?.message || errorData.error || `HTTP ${response.status}`;
+        if (response.status === 401) {
+          errorMessage = 'API密钥无效或已过期';
+        } else if (response.status === 403) {
+          errorMessage = 'API密钥权限不足';
+        } else if (response.status === 429) {
+          errorMessage = 'API调用频率超限';
+        } else if (response.status === 500) {
+          errorMessage = 'AI服务器内部错误';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      this.logger.info('AI API成功响应:', data);
+
+      if (!data.choices || data.choices.length === 0) {
+        throw new Error('AI API返回格式异常：缺少choices字段');
+      }
+
+      const aiResponse = data.choices[0].message?.content || '';
+      this.logger.info('AI回复内容:', aiResponse);
 
       return {
         available: true,
         model: model,
-        status: 'connected'
+        status: 'connected',
+        response: aiResponse,
+        usage: data.usage,
+        details: `成功连接到 ${model}，响应时间正常`
       };
     } catch (error) {
+      this.logger.error('AI配置测试失败:', error);
+      
+      let errorMessage = '连接失败';
+      if (error.message.includes('401')) {
+        errorMessage = 'API密钥无效';
+      } else if (error.message.includes('403')) {
+        errorMessage = 'API密钥权限不足';
+      } else if (error.message.includes('429')) {
+        errorMessage = 'API调用频率超限';
+      } else if (error.message.includes('ENOTFOUND')) {
+        errorMessage = '无法连接到AI服务器，请检查网络和Base URL';
+      } else if (error.message.includes('ECONNREFUSED')) {
+        errorMessage = '连接被拒绝，请检查Base URL是否正确';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = '请求超时，请检查网络连接';
+      } else {
+        errorMessage = error.message || '未知错误';
+      }
+
       return {
         available: false,
-        error: error.response?.status === 401 ? 'API密钥无效' : '连接失败'
+        error: errorMessage,
+        details: `测试失败原因: ${error.message}`
       };
     }
   }

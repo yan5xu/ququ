@@ -69,9 +69,29 @@ export const useTextProcessing = () => {
 
   // 直接调用AI API
   const callAIAPI = useCallback(async (text, mode) => {
-    const apiKey = process.env.AI_API_KEY || localStorage.getItem('ai_api_key');
+    // 优先从Electron API获取设置，然后是localStorage，最后是环境变量
+    let apiKey, baseUrl, model;
+    
+    if (window.electronAPI) {
+      try {
+        apiKey = await window.electronAPI.getSetting('ai_api_key') || process.env.AI_API_KEY;
+        baseUrl = await window.electronAPI.getSetting('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
+        model = await window.electronAPI.getSetting('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+      } catch (error) {
+        // 如果获取设置失败，回退到localStorage和环境变量
+        apiKey = localStorage.getItem('ai_api_key') || process.env.AI_API_KEY;
+        baseUrl = localStorage.getItem('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
+        model = localStorage.getItem('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+      }
+    } else {
+      // Web环境下使用localStorage
+      apiKey = localStorage.getItem('ai_api_key') || process.env.AI_API_KEY;
+      baseUrl = localStorage.getItem('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
+      model = localStorage.getItem('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+    }
+    
     if (!apiKey) {
-      throw new Error('请先配置AI API密钥');
+      throw new Error('请先在设置页面配置AI API密钥');
     }
 
     const prompts = {
@@ -122,8 +142,7 @@ ${text}
 请直接返回优化后的文本，不需要解释过程。`
     };
 
-    const baseUrl = process.env.AI_BASE_URL || localStorage.getItem('ai_base_url') || 'https://api.openai.com/v1';
-    const model = process.env.AI_MODEL || localStorage.getItem('ai_model') || 'gpt-3.5-turbo';
+    // baseUrl和model已经在上面获取了
 
     const requestData = {
       model: model,
