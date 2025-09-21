@@ -83,6 +83,23 @@ pnpm run dev
 ### 3. 配置AI模型
 启动应用后，在 **设置页面** 中填入您的AI服务商提供的 **API Key**、**Base URL** 和 **模型名称**。配置将自动保存在本地，非常方便。
 
+### 4. 故障排除
+
+#### FunASR模型加载缓慢问题
+
+如果您在macOS上遇到SSL兼容性警告导致模型加载变慢，可以通过以下命令修复：
+
+```bash
+# 修复urllib3兼容性问题，提升模型加载速度
+python3 -m pip install "urllib3<2.0"
+```
+
+#### 其他常见问题
+
+- **Python环境问题**: 确保使用Python 3.8+版本
+- **权限问题**: 在某些系统上可能需要使用 `--user` 参数安装Python包
+- **网络问题**: 首次运行时需要下载FunASR模型，请确保网络连接正常
+
 ## 🛠️ 技术栈
 
 - **前端**: React 19, TypeScript, Tailwind CSS, shadcn/ui, Vite
