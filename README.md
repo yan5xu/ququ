@@ -9,8 +9,6 @@
 
 **开源免费的 Wispr Flow 替代方案 | 为中文而生的下一代智能语音工作流**
 
-> 🆚 **vs Wispr Flow**: 完全开源免费 | 本地隐私保护 | 专为中文优化 | 支持国产AI模型
-
 </div>
 
 <div align="center">
