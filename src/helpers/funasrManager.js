@@ -240,7 +240,17 @@ class FunASRManager {
       return this.pythonCmd;
     }
 
+    // 获取项目根目录路径
+    const projectRoot = process.env.NODE_ENV === "development" 
+      ? path.join(__dirname, "..", "..") 
+      : process.resourcesPath;
+      
     const possiblePaths = [
+      // 优先使用 uv 虚拟环境中的 Python
+      path.join(projectRoot, ".venv", "bin", "python3.11"),
+      path.join(projectRoot, ".venv", "bin", "python3"),
+      path.join(projectRoot, ".venv", "bin", "python"),
+      // 然后尝试系统路径
       "python3.11",
       "python3",
       "python",
