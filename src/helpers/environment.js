@@ -16,10 +16,11 @@ class EnvironmentManager {
   }
 
   getAIConfig() {
+    // AI配置现在通过控制面板设置，不再从环境变量读取
     return {
-      apiKey: process.env.AI_API_KEY || "",
-      baseURL: process.env.AI_BASE_URL || "https://api.openai.com/v1",
-      model: process.env.AI_MODEL || "gpt-3.5-turbo",
+      apiKey: "",
+      baseURL: "https://api.openai.com/v1",
+      model: "gpt-3.5-turbo",
     };
   }
 
@@ -151,12 +152,6 @@ class EnvironmentManager {
 
   validateEnvironment() {
     const issues = [];
-    
-    // 检查必需的环境变量
-    const aiConfig = this.getAIConfig();
-    if (!aiConfig.apiKey) {
-      issues.push("AI_API_KEY 未设置");
-    }
     
     // 检查目录权限
     try {

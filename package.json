@@ -15,7 +15,6 @@
     "build:mac": "npm run build:renderer && electron-builder --mac",
     "build:win": "npm run build:renderer && electron-builder --win",
     "build:linux": "npm run build:renderer && electron-builder --linux",
-    "setup": "node setup.js",
     "pack": "npm run build:renderer && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
     "dist": "npm run build:renderer && electron-builder",
     "lint": "cd src && eslint .",

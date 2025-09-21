@@ -107,20 +107,20 @@ export const useTextProcessing = () => {
     
     if (window.electronAPI) {
       try {
-        apiKey = await window.electronAPI.getSetting('ai_api_key') || process.env.AI_API_KEY;
-        baseUrl = await window.electronAPI.getSetting('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
-        model = await window.electronAPI.getSetting('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+        apiKey = await window.electronAPI.getSetting('ai_api_key');
+        baseUrl = await window.electronAPI.getSetting('ai_base_url') || 'https://api.openai.com/v1';
+        model = await window.electronAPI.getSetting('ai_model') || 'gpt-3.5-turbo';
       } catch (error) {
-        // 如果获取设置失败，回退到localStorage和环境变量
-        apiKey = localStorage.getItem('ai_api_key') || process.env.AI_API_KEY;
-        baseUrl = localStorage.getItem('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
-        model = localStorage.getItem('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+        // 如果获取设置失败，回退到localStorage
+        apiKey = localStorage.getItem('ai_api_key');
+        baseUrl = localStorage.getItem('ai_base_url') || 'https://api.openai.com/v1';
+        model = localStorage.getItem('ai_model') || 'gpt-3.5-turbo';
       }
     } else {
       // Web环境下使用localStorage
-      apiKey = localStorage.getItem('ai_api_key') || process.env.AI_API_KEY;
-      baseUrl = localStorage.getItem('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
-      model = localStorage.getItem('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+      apiKey = localStorage.getItem('ai_api_key');
+      baseUrl = localStorage.getItem('ai_base_url') || 'https://api.openai.com/v1';
+      model = localStorage.getItem('ai_model') || 'gpt-3.5-turbo';
     }
     
     if (!apiKey) {

@@ -41,7 +41,7 @@
 
 ### 环境变量
 - `ELECTRON_USER_DATA`由主进程设置，供Python脚本日志使用
-- AI API配置使用`AI_API_KEY`、`AI_BASE_URL`、`AI_MODEL`格式
+- AI API配置通过应用内设置面板进行配置
 - 开发模式通过`NODE_ENV=development`检测
 
 ### CSS架构

@@ -176,10 +176,7 @@ class LogManager {
       env: {
         NODE_ENV: process.env.NODE_ENV,
         PATH: process.env.PATH,
-        PYTHON_PATH: process.env.PYTHON_PATH,
-        AI_API_KEY: process.env.AI_API_KEY ? '已设置' : '未设置',
-        AI_BASE_URL: process.env.AI_BASE_URL || '未设置',
-        AI_MODEL: process.env.AI_MODEL || '未设置'
+        PYTHON_PATH: process.env.PYTHON_PATH
       }
     };
   }

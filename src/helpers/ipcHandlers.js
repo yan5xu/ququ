@@ -787,9 +787,9 @@ class IPCHandlers {
             NODE_ENV: process.env.NODE_ENV,
             PATH: process.env.PATH,
             PYTHON_PATH: process.env.PYTHON_PATH,
-            AI_API_KEY: process.env.AI_API_KEY ? '已设置' : '未设置',
-            AI_BASE_URL: process.env.AI_BASE_URL || '未设置',
-            AI_MODEL: process.env.AI_MODEL || '未设置'
+            AI_API_KEY: '通过控制面板设置',
+            AI_BASE_URL: '通过控制面板设置',
+            AI_MODEL: '通过控制面板设置'
           },
           funasrStatus: {
             isInitialized: this.funasrManager.isInitialized,
@@ -875,8 +875,8 @@ class IPCHandlers {
   // AI文本处理方法
   async processTextWithAI(text, mode = 'optimize') {
     try {
-      // 优先从数据库设置中获取API密钥，然后才是环境变量
-      const apiKey = await this.databaseManager.getSetting('ai_api_key') || process.env.AI_API_KEY;
+      // 从数据库设置中获取API密钥
+      const apiKey = await this.databaseManager.getSetting('ai_api_key');
       if (!apiKey) {
         return {
           success: false,
@@ -968,8 +968,8 @@ ${text}
 请直接返回优化后的文本，不需要解释过程。`
       };
 
-      const baseUrl = await this.databaseManager.getSetting('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
-      const model = await this.databaseManager.getSetting('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+      const baseUrl = await this.databaseManager.getSetting('ai_base_url') || 'https://api.openai.com/v1';
+      const model = await this.databaseManager.getSetting('ai_model') || 'gpt-3.5-turbo';
 
       const requestData = {
         model: model,
@@ -1086,9 +1086,9 @@ ${text}
         model = testConfig.ai_model || 'gpt-3.5-turbo';
         this.logger.info('使用临时测试配置:', { baseUrl, model, apiKeyLength: apiKey?.length || 0 });
       } else {
-        apiKey = await this.databaseManager.getSetting('ai_api_key') || process.env.AI_API_KEY;
-        baseUrl = await this.databaseManager.getSetting('ai_base_url') || process.env.AI_BASE_URL || 'https://api.openai.com/v1';
-        model = await this.databaseManager.getSetting('ai_model') || process.env.AI_MODEL || 'gpt-3.5-turbo';
+        apiKey = await this.databaseManager.getSetting('ai_api_key');
+        baseUrl = await this.databaseManager.getSetting('ai_base_url') || 'https://api.openai.com/v1';
+        model = await this.databaseManager.getSetting('ai_model') || 'gpt-3.5-turbo';
         this.logger.info('使用已保存配置:', { baseUrl, model, apiKeyLength: apiKey?.length || 0 });
       }
       
