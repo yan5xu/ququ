@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useTextProcessing } from './useTextProcessing';
 import { useModelStatus } from './useModelStatus';
 
 /**
@@ -20,8 +19,7 @@ export const useRecording = () => {
   // 添加防重复处理机制
   const processingRef = useRef({ isProcessingAudio: false, lastProcessTime: 0 });
 
-  // 使用文本处理Hook和模型状态Hook
-  const { processText } = useTextProcessing();
+  // 使用模型状态Hook
   const modelStatus = useModelStatus();
 
   // 开始录音
@@ -125,143 +123,130 @@ export const useRecording = () => {
 
   // 处理音频
   const processAudio = useCallback(async (audioBlob) => {
-    // 设置处理状态，防止重复处理
     processingRef.current.isProcessingAudio = true;
     
     try {
-      // 转换音频格式为WAV（FunASR需要）
       const wavBlob = await convertToWav(audioBlob);
 
-      // 调用Electron API进行语音识别
       if (window.electronAPI) {
-        // 将Blob转换为ArrayBuffer
         const arrayBuffer = await wavBlob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        // 调用FunASR进行转录
-        const result = await window.electronAPI.transcribeAudio(uint8Array);
+        const transcriptionResult = await window.electronAPI.transcribeAudio(uint8Array);
 
-        if (result.success) {
-          // 立即显示FunASR识别结果（已包含标点恢复）
-          const initialResult = {
-            ...result,
-            original_text: result.raw_text || result.text, // 保存无标点的原始文本
-            enhanced_by_ai: false
+        if (transcriptionResult.success) {
+          const raw_text = transcriptionResult.text;
+          
+          // 准备转录数据
+          const transcriptionData = {
+            raw_text: raw_text,
+            text: raw_text, // 初始文本设为原始文本
+            confidence: transcriptionResult.confidence || 0,
+            language: transcriptionResult.language || 'zh-CN',
+            duration: transcriptionResult.duration || 0,
+            file_size: uint8Array.length,
           };
 
+          // 立即显示初步结果
           if (window.onTranscriptionComplete) {
-            window.onTranscriptionComplete(initialResult);
+            window.onTranscriptionComplete({ ...transcriptionResult, enhanced_by_ai: false });
           }
 
-          // 异步进行AI内容优化，不阻塞界面显示
+          // 异步处理AI优化和保存（只保存一次）
           setIsOptimizing(true);
-
-          // 使用setTimeout确保界面先更新
           setTimeout(async () => {
             try {
-              if (window.electronAPI && window.electronAPI.log) {
-                window.electronAPI.log('info', '开始AI优化，原始文本:', result.text);
-              }
-              // 调用AI进行内容优化，自动根据文本长度选择处理模式
-              const enhanced = await processText(result.text, 'auto');
-              if (window.electronAPI && window.electronAPI.log) {
-                window.electronAPI.log('info', 'AI优化结果:', enhanced);
+              // 从设置中读取是否启用AI优化
+              const useAI = await window.electronAPI.getSetting('enable_ai_optimization', true);
+
+              let finalData = { ...transcriptionData };
+
+              if (useAI) {
+                try {
+                  if (window.electronAPI && window.electronAPI.log) {
+                    window.electronAPI.log('info', '开始AI文本优化:', raw_text.substring(0, 50) + '...');
+                  }
+                  
+                  const result = await window.electronAPI.processText(raw_text, 'optimize');
+
+                  if (result && result.success) {
+                    const processed_text = result.text;
+                    finalData.processed_text = processed_text;
+                    // 如果AI优化后的文本与原始文本不同，则将优化后的文本作为主文本
+                    if (processed_text && processed_text.trim() !== raw_text.trim()) {
+                      finalData.text = processed_text;
+                    }
+                    if (window.electronAPI && window.electronAPI.log) {
+                      window.electronAPI.log('info', 'AI文本优化成功', processed_text.substring(0, 50) + '...');
+                    }
+                  } else {
+                    if (window.electronAPI && window.electronAPI.log) {
+                      window.electronAPI.log('error', 'AI文本优化失败:', result);
+                    }
+                  }
+                } catch (err) {
+                  if (window.electronAPI && window.electronAPI.log) {
+                    window.electronAPI.log('error', 'AI文本优化捕获到错误:', err);
+                  }
+                }
               }
 
-              if (enhanced) {
-                // AI优化完成，更新界面（即使结果与原文相同也显示）
-                const enhancedResult = {
-                  ...result,
-                  text: enhanced,
-                  original_text: result.raw_text || result.text,
-                  enhanced_by_ai: true
-                };
-
+              // 保存转录数据（只保存一次）
+              if (window.electronAPI) {
                 if (window.electronAPI && window.electronAPI.log) {
-                  window.electronAPI.log('info', '准备触发AI优化完成事件:', enhancedResult);
+                  window.electronAPI.log('info', '准备保存转录数据:', finalData);
+                }
+                const savedResult = await window.electronAPI.saveTranscription(finalData);
+                if (window.electronAPI && window.electronAPI.log) {
+                  window.electronAPI.log('info', '转录数据保存成功:', savedResult);
                 }
 
-                // 保存转录结果（包含原始文本、FunASR标点恢复文本和AI优化后的文本）
-                const transcriptionData = {
-                  text: enhanced,
-                  raw_text: result.raw_text || result.text,
-                  funasr_text: result.text, // FunASR处理后的文本（含标点）
-                  original_text: result.raw_text || result.text,
-                  confidence: result.confidence || 0,
-                  language: result.language || 'zh-CN',
-                  duration: result.duration || 0,
-                  file_size: uint8Array.length,
-                  enhanced_by_ai: true
-                };
-
-                await window.electronAPI.saveTranscription(transcriptionData);
-
-                // 触发AI优化完成事件
-                if (window.onAIOptimizationComplete) {
-                  if (window.electronAPI && window.electronAPI.log) {
-                    window.electronAPI.log('info', '触发AI优化完成事件');
+                // 通知UI更新并触发复制操作
+                if (useAI && finalData.processed_text && finalData.processed_text !== raw_text) {
+                  // 有AI优化结果时
+                  const enhancedResult = {
+                    ...transcriptionResult,
+                    text: finalData.processed_text,
+                    processed_text: finalData.processed_text,
+                    enhanced_by_ai: true,
+                  };
+                  if (window.onAIOptimizationComplete) {
+                    window.onAIOptimizationComplete(enhancedResult);
                   }
-                  window.onAIOptimizationComplete(enhancedResult);
                 } else {
-                  if (window.electronAPI && window.electronAPI.log) {
-                    window.electronAPI.log('error', 'window.onAIOptimizationComplete 回调函数不存在');
+                  // 没有AI优化或AI优化失败时，使用原始文本
+                  const finalResult = {
+                    ...transcriptionResult,
+                    text: raw_text,
+                    enhanced_by_ai: false,
+                  };
+                  if (window.onAIOptimizationComplete) {
+                    window.onAIOptimizationComplete(finalResult);
                   }
                 }
-              } else {
-                if (window.electronAPI && window.electronAPI.log) {
-                  window.electronAPI.log('info', 'AI优化结果为空，不更新界面');
-                }
               }
-            } catch (optimizeError) {
+            } catch (err) {
               if (window.electronAPI && window.electronAPI.log) {
-                window.electronAPI.log('warn', 'AI内容优化失败，保持FunASR处理结果:', optimizeError);
+                window.electronAPI.log('error', '处理和保存转录时出错:', err);
               }
-
-              // 保存FunASR处理结果
-              const transcriptionData = {
-                text: result.text,
-                raw_text: result.raw_text || result.text,
-                funasr_text: result.text,
-                original_text: result.raw_text || result.text,
-                confidence: result.confidence || 0,
-                language: result.language || 'zh-CN',
-                duration: result.duration || 0,
-                file_size: uint8Array.length,
-                enhanced_by_ai: false
-              };
-
-              await window.electronAPI.saveTranscription(transcriptionData);
             } finally {
               setIsOptimizing(false);
             }
-          }, 100); // 100ms延迟确保界面先更新
+          }, 100);
 
-          return initialResult;
+          return { ...transcriptionResult, enhanced_by_ai: false };
         } else {
-          throw new Error(result.error || '语音识别失败');
+          throw new Error(transcriptionResult.error || '语音识别失败');
         }
       } else {
-        // Web环境下的模拟处理
-        if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('warn', 'Electron API不可用，使用模拟数据');
-        }
-        const mockResult = {
-          success: true,
-          text: '这是模拟的语音识别结果，用于测试界面功能。',
-          confidence: 0.95,
-          duration: 3.5
-        };
-
-        if (window.onTranscriptionComplete) {
-          window.onTranscriptionComplete(mockResult);
-        }
-
+        // Web环境模拟
+        const mockResult = { success: true, text: '模拟识别结果。', confidence: 0.95, duration: 3.5 };
+        if (window.onTranscriptionComplete) window.onTranscriptionComplete(mockResult);
         return mockResult;
       }
     } catch (err) {
       throw new Error(`音频处理失败: ${err.message}`);
     } finally {
-      // 重置处理状态
       processingRef.current.isProcessingAudio = false;
     }
   }, []);

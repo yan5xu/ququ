@@ -275,17 +275,7 @@ export default function App() {
       // 不立即粘贴，等待AI优化完成后再粘贴
       console.log("⏳ 等待AI优化完成后再进行粘贴...");
       
-      // 并行保存到数据库
-      const savePromise = window.electronAPI?.saveTranscription({
-        text: transcriptionResult.text,
-        raw_text: transcriptionResult.raw_text || transcriptionResult.text,
-        funasr_text: transcriptionResult.text,
-        original_text: transcriptionResult.raw_text || transcriptionResult.text,
-        confidence: transcriptionResult.confidence || 0,
-        language: transcriptionResult.language || 'zh-CN',
-        duration: transcriptionResult.duration || 0,
-        enhanced_by_ai: false
-      }).catch(err => console.warn("保存转录记录失败:", err));
+      // 注意：不在这里保存到数据库，由 useRecording.js 统一处理保存逻辑
 
       toast.success("🎤 语音识别完成，AI正在优化文本...");
     } else {

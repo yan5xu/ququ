@@ -90,33 +90,30 @@ html, body {
   font-weight: 400;
 }
 
-/* 中文标题优化 - 对比度7:1 */
+/* 中文标题优化 */
 .chinese-title {
   font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
   line-height: 1.4;
   letter-spacing: 0.1em;
   font-weight: 600;
-  color: #111827; /* 对比度 15.3:1 */
 }
 
-/* 中文内容文本优化 - 对比度4.5:1以上 */
+/* 中文内容文本优化 */
 .chinese-content {
   font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
   line-height: 2;
   letter-spacing: 0.08em;
   font-size: 16px;
-  color: #1f2937; /* 对比度 12.6:1 */
   font-weight: 400;
 }
 
-/* 状态文本优化 - 对比度4.5:1以上 */
+/* 状态文本优化 */
 .status-text {
   font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'WenQuanYi Micro Hei', system-ui, -apple-system, sans-serif;
   line-height: 1.6;
   letter-spacing: 0.05em;
   font-weight: 500;
   font-size: 15px;
-  color: #374151; /* 对比度 9.7:1 */
 }
 
 /* 次要文本 - 对比度4.5:1 */
@@ -335,30 +332,7 @@ html, body {
   }
 }
 
-/* 深色模式下的文本颜色优化 - 基于WCAG标准 */
-.dark .chinese-content {
-  color: #f9fafb; /* 对比度 17.4:1 */
-}
-
-.dark .chinese-title {
-  color: #ffffff; /* 对比度 21:1 */
-}
-
-.dark .status-text {
-  color: #f3f4f6; /* 对比度 15.8:1 */
-}
-
-.dark .text-secondary {
-  color: #e5e7eb; /* 对比度 12.6:1 */
-}
-
-.dark .text-muted {
-  color: #d1d5db; /* 对比度 9.7:1 */
-}
-
-.dark .text-emphasis {
-  color: #ffffff; /* 对比度 21:1 */
-}
+/* 移除深色模式下的硬编码文本颜色，让Tailwind自动处理 */
 
 /* 高对比度模式支持 */
 @media (prefers-contrast: high) {

@@ -10,7 +10,8 @@ const SettingsPage = () => {
   const [settings, setSettings] = useState({
     ai_api_key: "",
     ai_base_url: "https://api.openai.com/v1",
-    ai_model: "gpt-3.5-turbo"
+    ai_model: "gpt-3.5-turbo",
+    enable_ai_optimization: true
   });
   
   const [customModel, setCustomModel] = useState(false);
@@ -49,7 +50,8 @@ const SettingsPage = () => {
         const loadedSettings = {
           ai_api_key: allSettings.ai_api_key || "",
           ai_base_url: allSettings.ai_base_url || "https://api.openai.com/v1",
-          ai_model: allSettings.ai_model || "gpt-3.5-turbo"
+          ai_model: allSettings.ai_model || "gpt-3.5-turbo",
+          enable_ai_optimization: allSettings.enable_ai_optimization !== false // 默认为true
         };
         setSettings(prev => ({ ...prev, ...loadedSettings }));
         
@@ -74,6 +76,7 @@ const SettingsPage = () => {
         await window.electronAPI.setSetting('ai_api_key', settings.ai_api_key);
         await window.electronAPI.setSetting('ai_base_url', settings.ai_base_url);
         await window.electronAPI.setSetting('ai_model', settings.ai_model);
+        await window.electronAPI.setSetting('enable_ai_optimization', settings.enable_ai_optimization);
         
         toast.success("设置保存成功");
       }
@@ -249,10 +252,36 @@ const SettingsPage = () => {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 chinese-title">
                   AI配置
                 </h2>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                 配置AI模型以优化和增强语音识别结果。如果API Key无效或未填写，优化功能将自动禁用。
+               </p>
               </div>
 
-              <div className="space-y-4">
-                {/* API Key */}
+             <div className="space-y-4">
+               {/* AI优化开关 */}
+               <div className="flex items-center justify-between pt-4">
+                 <label htmlFor="ai-optimization-toggle" className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                   启用AI文本优化
+                 </label>
+                 <button
+                   type="button"
+                   role="switch"
+                   aria-checked={settings.enable_ai_optimization}
+                   onClick={() => handleInputChange('enable_ai_optimization', !settings.enable_ai_optimization)}
+                   className={`${
+                     settings.enable_ai_optimization ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                   } relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                 >
+                   <span
+                     aria-hidden="true"
+                     className={`${
+                       settings.enable_ai_optimization ? 'translate-x-4' : 'translate-x-0'
+                     } inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                   />
+                 </button>
+               </div>
+
+               {/* API Key */}
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                     API Key *

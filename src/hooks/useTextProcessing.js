@@ -25,67 +25,74 @@ export const useTextProcessing = () => {
     }
   }, []);
 
-  // 处理文本的主要函数
-  const processText = useCallback(async (text, mode = 'auto') => {
-    if (!text || text.trim().length === 0) {
-      setError('文本内容不能为空');
+  // 处理并保存转录的函数
+  const handleTranscription = useCallback(async (transcriptionData, useAI) => {
+    const { raw_text, duration, file_size } = transcriptionData;
+
+    if (!raw_text || raw_text.trim().length === 0) {
+      setError('转录文本内容不能为空');
       return null;
     }
 
-    // 自动确定处理模式
-    const actualMode = determineProcessingMode(text, mode);
-
-    if (window.electronAPI && window.electronAPI.log) {
-      window.electronAPI.log('info', '开始处理文本:', {
-        text: text.substring(0, 50) + '...',
-        originalMode: mode,
-        actualMode,
-        textLength: text.length,
-        wordCount: text.trim().split(/\s+/).length
-      });
-    }
     setIsProcessing(true);
     setError(null);
 
-    try {
-      let result;
-      
-      if (window.electronAPI) {
-        // 使用Electron API调用AI模型
+    let processed_text = null;
+    let finalData = { ...transcriptionData, text: raw_text };
+
+    if (useAI) {
+      try {
+        const actualMode = determineProcessingMode(raw_text, 'auto');
         if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('info', '使用Electron API处理文本');
+          window.electronAPI.log('info', '开始AI文本优化:', {
+            text: raw_text.substring(0, 50) + '...',
+            mode: actualMode,
+          });
         }
-        result = await window.electronAPI.processText(text, actualMode);
-        if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('info', 'Electron API处理结果:', result);
+        
+        const result = await window.electronAPI.processText(raw_text, actualMode);
+
+        if (result && result.success) {
+          processed_text = result.text;
+          finalData.processed_text = processed_text;
+          // 如果AI优化后的文本与原始文本不同，则将优化后的文本作为主文本
+          if (processed_text && processed_text.trim() !== raw_text.trim()) {
+            finalData.text = processed_text;
+          }
+          if (window.electronAPI && window.electronAPI.log) {
+            window.electronAPI.log('info', 'AI文本优化成功', { processed_text: processed_text.substring(0, 50) + '...' });
+          }
+        } else {
+          if (window.electronAPI && window.electronAPI.log) {
+            window.electronAPI.log('error', 'AI文本优化失败:', result);
+          }
+          setError(result?.error || 'AI文本优化失败');
         }
-      } else {
-        // Web环境下直接调用AI API
+      } catch (err) {
+        const errorMessage = err.message || 'AI处理过程中发生未知错误';
+        setError(errorMessage);
         if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('info', '使用Web API处理文本');
-        }
-        result = await callAIAPI(text, actualMode);
-        if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('info', 'Web API处理结果:', result);
+          window.electronAPI.log('error', 'AI文本优化捕获到错误:', err);
         }
       }
+    }
 
-      if (result && result.success) {
+    try {
+      if (window.electronAPI) {
         if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('info', '文本处理成功，返回结果:', result.text.substring(0, 50) + '...');
+          window.electronAPI.log('info', '准备保存转录数据:', finalData);
         }
-        return result.text;
-      } else {
+        const savedResult = await window.electronAPI.saveTranscription(finalData);
         if (window.electronAPI && window.electronAPI.log) {
-          window.electronAPI.log('error', '文本处理失败:', result);
+          window.electronAPI.log('info', '转录数据保存成功:', savedResult);
         }
-        throw new Error(result?.error || '文本处理失败');
+        return { ...finalData, id: savedResult.lastInsertRowid };
       }
     } catch (err) {
-      const errorMessage = err.message || '文本处理过程中发生未知错误';
+      const errorMessage = err.message || '保存转录数据时发生未知错误';
       setError(errorMessage);
       if (window.electronAPI && window.electronAPI.log) {
-        window.electronAPI.log('error', '文本处理错误:', err);
+        window.electronAPI.log('error', '保存转录数据失败:', err);
       }
       return null;
     } finally {
@@ -285,7 +292,7 @@ ${text}
   }, []);
 
   return {
-    processText,
+    handleTranscription,
     isProcessing,
     error
   };

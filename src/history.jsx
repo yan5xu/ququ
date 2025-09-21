@@ -147,7 +147,7 @@ const HistoryContent = ({ onCopy }) => {
               placeholder="搜索转录内容..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent chinese-text text-lg"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent chinese-text text-lg"
             />
           </div>
           <div className="mt-3 flex items-center justify-between">
@@ -226,22 +226,30 @@ const HistoryContent = ({ onCopy }) => {
                     </div>
                   </div>
 
-                  {/* 原始文本 */}
-                  {item.text && (
+                  {/* 最终文本 */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">最终结果:</h4>
+                    <p className="chinese-content leading-relaxed bg-gray-50 dark:bg-gray-700/60 p-4 rounded-lg border dark:border-gray-600/30">
+                      {item.text}
+                    </p>
+                  </div>
+
+                  {/* AI优化文本 */}
+                  {item.processed_text && item.processed_text.trim() !== (item.raw_text || '').trim() && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">原始识别:</h4>
-                      <p className="text-gray-900 dark:text-gray-100 chinese-content leading-relaxed bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border dark:border-gray-600">
-                        {item.text}
+                      <h4 className="text-sm font-medium text-emerald-700 dark:text-emerald-400 mb-2">AI优化:</h4>
+                      <p className="chinese-content leading-relaxed bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-700">
+                        {item.processed_text}
                       </p>
                     </div>
                   )}
 
-                  {/* AI优化文本 */}
-                  {item.processed_text && item.processed_text !== item.text && (
+                  {/* 原始识别文本 */}
+                  {item.raw_text && item.raw_text.trim() !== item.text.trim() && (
                     <div>
-                      <h4 className="text-sm font-medium text-emerald-700 dark:text-emerald-400 mb-2">AI优化:</h4>
-                      <p className="text-gray-900 dark:text-gray-100 chinese-content leading-relaxed bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-700">
-                        {item.processed_text}
+                      <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">原始识别:</h4>
+                      <p className="text-xs chinese-content leading-relaxed bg-gray-100 dark:bg-gray-700/40 p-3 rounded-lg border dark:border-gray-600/20 text-gray-600 dark:text-gray-200">
+                        {item.raw_text}
                       </p>
                     </div>
                   )}
