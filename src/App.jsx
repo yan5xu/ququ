@@ -75,8 +75,24 @@ const VoiceWaveIndicator = ({ isListening }) => {
 };
 
 // 增强的工具提示组件
-const Tooltip = ({ children, content }) => {
+const Tooltip = ({ children, content, position = "top" }) => {
   const [isVisible, setIsVisible] = useState(false);
+
+  const getPositionClasses = () => {
+    if (position === "bottom") {
+      return {
+        tooltip: "absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 text-white bg-gradient-to-r from-neutral-800 to-neutral-700 rounded-md whitespace-nowrap z-50 transition-opacity duration-150",
+        arrow: "absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-b-2 border-transparent border-b-neutral-800"
+      };
+    }
+    // 默认为顶部
+    return {
+      tooltip: "absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-white bg-gradient-to-r from-neutral-800 to-neutral-700 rounded-md whitespace-nowrap z-50 transition-opacity duration-150",
+      arrow: "absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-neutral-800"
+    };
+  };
+
+  const { tooltip, arrow } = getPositionClasses();
 
   return (
     <div className="relative inline-block">
@@ -88,11 +104,11 @@ const Tooltip = ({ children, content }) => {
       </div>
       {isVisible && (
         <div
-          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-white bg-gradient-to-r from-neutral-800 to-neutral-700 rounded-md whitespace-nowrap z-10 transition-opacity duration-150"
+          className={tooltip}
           style={{ fontSize: "10px" }}
         >
           {content}
-          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-neutral-800"></div>
+          <div className={arrow}></div>
         </div>
       )}
     </div>
@@ -591,7 +607,7 @@ export default function App() {
             蛐蛐
           </h1>
           <div className="flex items-center space-x-3 non-draggable">
-            <Tooltip content="历史记录">
+            <Tooltip content="历史记录" position="bottom">
               <button
                 onClick={handleOpenHistory}
                 className="p-3 hover:bg-white/70 dark:hover:bg-gray-700/70 rounded-xl transition-colors shadow-sm"
@@ -599,7 +615,7 @@ export default function App() {
                 <History className="w-6 h-6 text-gray-700 dark:text-gray-300" />
               </button>
             </Tooltip>
-            <Tooltip content="设置">
+            <Tooltip content="设置" position="bottom">
               <button
                 onClick={handleOpenSettings}
                 className="p-3 hover:bg-white/70 dark:hover:bg-gray-700/70 rounded-xl transition-colors shadow-sm"

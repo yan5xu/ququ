@@ -32,7 +32,7 @@ class WindowManager {
     });
 
     const isDev = process.env.NODE_ENV === "development";
-    
+
     if (isDev) {
       await this.mainWindow.loadURL("http://localhost:5173");
     } else {
@@ -64,7 +64,7 @@ class WindowManager {
     });
 
     const isDev = process.env.NODE_ENV === "development";
-    
+
     if (isDev) {
       await this.controlPanelWindow.loadURL("http://localhost:5173?panel=control");
     } else {
@@ -92,6 +92,7 @@ class WindowManager {
       height: 700,
       show: false,
       title: "转录历史 - 蛐蛐",
+      alwaysOnTop: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -100,7 +101,7 @@ class WindowManager {
     });
 
     const isDev = process.env.NODE_ENV === "development";
-    
+
     if (isDev) {
       await this.historyWindow.loadURL("http://localhost:5173/history.html");
     } else {
@@ -127,6 +128,7 @@ class WindowManager {
       height: 600,
       show: false,
       title: "设置 - 蛐蛐",
+      alwaysOnTop: true,
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -135,7 +137,7 @@ class WindowManager {
     });
 
     const isDev = process.env.NODE_ENV === "development";
-    
+
     if (isDev) {
       await this.settingsWindow.loadURL("http://localhost:5173?page=settings");
     } else {
@@ -172,9 +174,12 @@ class WindowManager {
     if (this.historyWindow) {
       this.historyWindow.show();
       this.historyWindow.focus();
+      this.historyWindow.setAlwaysOnTop(true);
     } else {
       this.createHistoryWindow().then(() => {
         this.historyWindow.show();
+        this.historyWindow.focus();
+        this.historyWindow.setAlwaysOnTop(true);
       });
     }
   }
@@ -195,9 +200,12 @@ class WindowManager {
     if (this.settingsWindow) {
       this.settingsWindow.show();
       this.settingsWindow.focus();
+      this.settingsWindow.setAlwaysOnTop(true);
     } else {
       this.createSettingsWindow().then(() => {
         this.settingsWindow.show();
+        this.settingsWindow.focus();
+        this.settingsWindow.setAlwaysOnTop(true);
       });
     }
   }
