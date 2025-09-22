@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 允许应用访问网络 -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    
+    <!-- 允许应用访问网络服务器 -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+    
+    <!-- 允许应用访问文件系统 -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    
+    <!-- 允许应用访问下载目录 -->
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
+    
+    <!-- 允许应用访问用户数据目录 -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+    
+    <!-- 允许应用执行外部程序（Python） -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    
+    <!-- 允许应用加载动态库 -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    
+    <!-- 允许应用禁用库验证（Python扩展需要） -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    
+    <!-- 允许应用访问麦克风 -->
+    <key>com.apple.security.device.microphone</key>
+    <true/>
+    
+    <!-- 允许应用访问辅助功能（文本插入需要） -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    
+    <!-- 允许应用注册全局热键 -->
+    <key>com.apple.security.temporary-exception.apple-events</key>
+    <array>
+        <string>com.apple.systemevents</string>
+    </array>
+    
+    <!-- 允许应用在后台运行 -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+    
+    <!-- JIT编译支持（PyTorch需要） -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>

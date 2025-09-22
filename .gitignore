@@ -149,3 +149,5 @@ temp/
 # Build tools
 .gyp
 .gyprc
+
+python

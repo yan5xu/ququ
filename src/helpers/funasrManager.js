@@ -53,6 +53,86 @@ class FunASRManager {
     }
   }
 
+  getEmbeddedPythonPath() {
+    // 获取嵌入式Python路径
+    if (process.env.NODE_ENV === "development") {
+      return path.join(__dirname, "..", "..", "python", "bin", "python3.11");
+    } else {
+      return path.join(
+        process.resourcesPath,
+        "app.asar.unpacked",
+        "python",
+        "bin",
+        "python3.11"
+      );
+    }
+  }
+
+  setupIsolatedEnvironment() {
+    // 设置完全隔离的Python环境变量
+    const pythonPath = this.getEmbeddedPythonPath();
+    const pythonHome = path.dirname(path.dirname(pythonPath));
+    const sitePackages = path.join(pythonHome, 'lib', 'python3.11', 'site-packages');
+    
+    // 设置Python环境变量
+    process.env.PYTHONHOME = pythonHome;
+    process.env.PYTHONPATH = sitePackages;
+    process.env.PYTHONDONTWRITEBYTECODE = '1';  // 不生成.pyc文件
+    process.env.PYTHONIOENCODING = 'utf-8';
+    process.env.PYTHONUNBUFFERED = '1';  // 确保输出不被缓冲
+    
+    // 清除可能干扰的系统Python环境变量
+    delete process.env.PYTHONUSERBASE;
+    delete process.env.PYTHONSTARTUP;
+    delete process.env.VIRTUAL_ENV;
+    
+    this.logger.info && this.logger.info('设置嵌入式Python环境', {
+      PYTHONHOME: process.env.PYTHONHOME,
+      PYTHONPATH: process.env.PYTHONPATH,
+      pythonExecutable: pythonPath
+    });
+  }
+
+  buildPythonEnvironment() {
+    // 构建完整的Python环境变量，确保嵌入式Python能正确找到所有依赖
+    const pythonPath = this.getEmbeddedPythonPath();
+    const pythonHome = path.dirname(path.dirname(pythonPath));
+    const sitePackages = path.join(pythonHome, 'lib', 'python3.11', 'site-packages');
+    
+    // 构建完整的环境变量
+    const env = {
+      ...process.env,
+      // Python核心环境变量
+      PYTHONHOME: pythonHome,
+      PYTHONPATH: sitePackages,
+      PYTHONDONTWRITEBYTECODE: '1',
+      PYTHONIOENCODING: 'utf-8',
+      PYTHONUNBUFFERED: '1',
+      
+      // 确保库路径正确
+      LD_LIBRARY_PATH: path.join(pythonHome, 'lib'),
+      DYLD_LIBRARY_PATH: path.join(pythonHome, 'lib'), // macOS
+      
+      // 设置用户数据目录用于日志
+      ELECTRON_USER_DATA: require('electron').app.getPath('userData')
+    };
+    
+    // 清除可能干扰的系统Python环境变量
+    delete env.PYTHONUSERBASE;
+    delete env.PYTHONSTARTUP;
+    delete env.VIRTUAL_ENV;
+    
+    this.logger.info && this.logger.info('构建Python环境变量', {
+      PYTHONHOME: env.PYTHONHOME,
+      PYTHONPATH: env.PYTHONPATH,
+      LD_LIBRARY_PATH: env.LD_LIBRARY_PATH,
+      DYLD_LIBRARY_PATH: env.DYLD_LIBRARY_PATH,
+      pythonExecutable: pythonPath
+    });
+    
+    return env;
+  }
+
   getModelCachePath() {
     /**
      * 获取模型缓存路径
@@ -249,10 +329,13 @@ class FunASRManager {
       }
       
       return new Promise((resolve, reject) => {
+        // 确保使用正确的Python环境
+        const pythonEnv = this.buildPythonEnvironment();
+        
         const downloadProcess = spawn(pythonCmd, [scriptPath], {
           stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,
-          env: { ...process.env }
+          env: pythonEnv
         });
         
         let hasError = false;
@@ -431,16 +514,23 @@ class FunASRManager {
         return;
       }
 
+      // 确保环境变量正确设置
+      this.setupIsolatedEnvironment();
+      
+      // 构建完整的环境变量
+      const pythonEnv = this.buildPythonEnvironment();
+
       return new Promise((resolve) => {
         this.logger.info && this.logger.info('启动FunASR Python进程', {
           command: pythonCmd,
-          args: [serverPath]
+          args: [serverPath],
+          env: pythonEnv
         });
 
         this.serverProcess = spawn(pythonCmd, [serverPath], {
           stdio: ["pipe", "pipe", "pipe"],
           windowsHide: true,
-          env: { ...process.env } // 确保环境变量传递
+          env: pythonEnv // 使用完整的Python环境变量
         });
 
         let initResponseReceived = false;
@@ -582,10 +672,49 @@ class FunASRManager {
       return this.pythonCmd;
     }
 
-    // 获取项目根目录路径
-    const projectRoot = process.env.NODE_ENV === "development" 
-      ? path.join(__dirname, "..", "..") 
-      : process.resourcesPath;
+    // 优先使用嵌入式Python（完全隔离策略）
+    const embeddedPython = this.getEmbeddedPythonPath();
+    
+    this.logger.info && this.logger.info('检查嵌入式Python', {
+      path: embeddedPython,
+      exists: fs.existsSync(embeddedPython)
+    });
+
+    if (fs.existsSync(embeddedPython)) {
+      try {
+        // 设置隔离环境
+        this.setupIsolatedEnvironment();
+        
+        // 验证嵌入式Python是否可用
+        const version = await this.getPythonVersion(embeddedPython);
+        if (this.isPythonVersionSupported(version)) {
+          this.pythonCmd = embeddedPython;
+          this.logger.info && this.logger.info('使用嵌入式Python', {
+            path: embeddedPython,
+            version: `${version.major}.${version.minor}`
+          });
+          return embeddedPython;
+        }
+      } catch (error) {
+        this.logger.warn && this.logger.warn('嵌入式Python不可用', error);
+      }
+    }
+
+    // 如果嵌入式Python不可用，在开发模式下回退到系统Python
+    if (process.env.NODE_ENV === "development") {
+      this.logger.warn && this.logger.warn('开发模式：回退到系统Python');
+      return await this.findPythonExecutableWithFallback();
+    }
+
+    // 生产模式下不回退，确保完全隔离
+    throw new Error(
+      "嵌入式Python环境不可用。请重新安装应用或运行构建脚本准备Python环境。"
+    );
+  }
+
+  async findPythonExecutableWithFallback() {
+    // 保留原有的查找逻辑作为开发时的回退方案
+    const projectRoot = path.join(__dirname, "..", "..");
       
     const possiblePaths = [
       // 优先使用 uv 虚拟环境中的 Python
@@ -610,7 +739,7 @@ class FunASRManager {
       try {
         const version = await this.getPythonVersion(pythonPath);
         if (this.isPythonVersionSupported(version)) {
-          this.pythonCmd = pythonPath; // 缓存结果
+          this.pythonCmd = pythonPath;
           return pythonPath;
         }
       } catch (error) {
@@ -625,7 +754,13 @@ class FunASRManager {
 
   async getPythonVersion(pythonPath) {
     return new Promise((resolve) => {
-      const testProcess = spawn(pythonPath, ["--version"]);
+      // 如果是嵌入式Python，使用完整的环境变量
+      const isEmbedded = pythonPath === this.getEmbeddedPythonPath();
+      const env = isEmbedded ? this.buildPythonEnvironment() : process.env;
+      
+      const testProcess = spawn(pythonPath, ["--version"], {
+        env: env
+      });
       let output = "";
       
       testProcess.stdout.on("data", (data) => output += data);
@@ -684,21 +819,37 @@ class FunASRManager {
       const pythonCmd = await this.findPythonExecutable();
 
       const result = await new Promise((resolve) => {
+        // 确保使用正确的Python环境
+        const pythonEnv = this.buildPythonEnvironment();
+        
         const checkProcess = spawn(pythonCmd, [
           "-c",
           'import funasr; print("OK")',
-        ]);
+        ], {
+          env: pythonEnv
+        });
 
         let output = "";
+        let errorOutput = "";
+        
         checkProcess.stdout.on("data", (data) => {
           output += data.toString();
+        });
+        
+        checkProcess.stderr.on("data", (data) => {
+          errorOutput += data.toString();
         });
 
         checkProcess.on("close", (code) => {
           if (code === 0 && output.includes("OK")) {
             resolve({ installed: true, working: true });
           } else {
-            resolve({ installed: false, working: false });
+            this.logger.error && this.logger.error('FunASR检查失败', {
+              code,
+              output,
+              errorOutput
+            });
+            resolve({ installed: false, working: false, error: errorOutput || output });
           }
         });
 
