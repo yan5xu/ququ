@@ -413,8 +413,28 @@ class FunASRServer:
         """运行服务器主循环"""
         logger.info("FunASR服务器启动")
 
-        # 立即初始化模型
-        init_result = self.initialize()
+        # 检查模型文件是否存在，如果不存在则不初始化
+        import os
+        home_dir = os.path.expanduser("~")
+        cache_path = os.path.join(home_dir, ".cache", "modelscope", "hub", "models", "damo")
+        
+        models_exist = all([
+            os.path.exists(os.path.join(cache_path, "speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch", "model.pt")),
+            os.path.exists(os.path.join(cache_path, "speech_fsmn_vad_zh-cn-16k-common-pytorch", "model.pt")),
+            os.path.exists(os.path.join(cache_path, "punc_ct-transformer_zh-cn-common-vocab272727-pytorch", "model.pt"))
+        ])
+        
+        if models_exist:
+            logger.info("模型文件存在，开始初始化")
+            init_result = self.initialize()
+        else:
+            logger.info("模型文件不存在，跳过初始化")
+            init_result = {
+                "success": False,
+                "error": "模型文件未下载，请先下载模型",
+                "type": "models_not_downloaded"
+            }
+        
         print(json.dumps(init_result, ensure_ascii=False))
         sys.stdout.flush()
 

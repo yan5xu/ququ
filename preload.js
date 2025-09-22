@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   transcribeAudio: (audioData) => ipcRenderer.invoke("transcribe-audio", audioData),
   checkFunASRStatus: () => ipcRenderer.invoke("check-funasr-status"),
   installFunASR: () => ipcRenderer.invoke("install-funasr"),
+  restartFunasrServer: () => ipcRenderer.invoke("restart-funasr-server"),
+
+  // 模型文件管理
+  checkModelFiles: () => ipcRenderer.invoke("check-model-files"),
+  getDownloadProgress: () => ipcRenderer.invoke("get-download-progress"),
+  downloadModels: () => ipcRenderer.invoke("download-models"),
 
   // AI文本处理
   processText: (text, mode) => ipcRenderer.invoke("process-text", text, mode),
@@ -139,6 +145,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getAvailableModels: () => ipcRenderer.invoke("get-available-models"),
   getCurrentModel: () => ipcRenderer.invoke("get-current-model"),
   switchModel: (modelName) => ipcRenderer.invoke("switch-model", modelName),
+
+  // 模型下载进度监听
+  onModelDownloadProgress: (callback) => {
+    ipcRenderer.on("model-download-progress", callback);
+    return () => ipcRenderer.removeListener("model-download-progress", callback);
+  },
 
   // 性能监控
   getPerformanceStats: () => ipcRenderer.invoke("get-performance-stats"),

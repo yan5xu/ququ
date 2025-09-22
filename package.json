@@ -108,6 +108,7 @@
       "main.js",
       "preload.js",
       "funasr_server.py",
+      "download_models.py",
       "package.json",
       "node_modules/**/*",
       "src/dist/**/*",
@@ -119,6 +120,7 @@
     ],
     "asarUnpack": [
       "funasr_server.py",
+      "download_models.py",
       "node_modules/**/*ffmpeg-static*/**/*",
       "node_modules/**/*better-sqlite3*/**/*",
       "node_modules/**/*bindings*/**/*"

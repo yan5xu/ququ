@@ -17,6 +17,26 @@ class FunASRManager {
     this.initializationPromise = null; // 缓存初始化Promise
     this.serverProcess = null; // FunASR服务器进程
     this.serverReady = false; // 服务器是否就绪
+    this.modelsDownloaded = null; // 缓存模型下载状态
+    
+    // 模型配置
+    this.modelConfigs = {
+      "asr": {
+        "name": "damo/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+        "cache_path": "speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+        "expected_size": 840 * 1024 * 1024  // 840MB
+      },
+      "vad": {
+        "name": "damo/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+        "cache_path": "speech_fsmn_vad_zh-cn-16k-common-pytorch",
+        "expected_size": 1.6 * 1024 * 1024  // 1.6MB
+      },
+      "punc": {
+        "name": "damo/punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+        "cache_path": "punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+        "expected_size": 278 * 1024 * 1024  // 278MB
+      }
+    };
   }
 
 
@@ -30,6 +50,328 @@ class FunASRManager {
         "app.asar.unpacked",
         "funasr_server.py"
       );
+    }
+  }
+
+  getModelCachePath() {
+    /**
+     * 获取模型缓存路径
+     */
+    const homeDir = os.homedir();
+    return path.join(homeDir, ".cache", "modelscope", "hub", "models", "damo");
+  }
+
+  async checkModelFiles() {
+    /**
+     * 检查所有模型文件是否存在
+     */
+    try {
+      const cachePath = this.getModelCachePath();
+      this.logger.info && this.logger.info('检查模型缓存路径:', cachePath);
+      
+      if (!fs.existsSync(cachePath)) {
+        this.logger.info && this.logger.info('模型缓存目录不存在');
+        this.modelsDownloaded = false;
+        return {
+          success: true,
+          models_downloaded: false,
+          missing_models: ["asr", "vad", "punc"],
+          details: {}
+        };
+      }
+      
+      const results = {};
+      const missingModels = [];
+      
+      for (const [modelType, config] of Object.entries(this.modelConfigs)) {
+        const modelDir = path.join(cachePath, config.cache_path);
+        const modelFile = path.join(modelDir, "model.pt");
+        
+        if (fs.existsSync(modelFile)) {
+          const stats = fs.statSync(modelFile);
+          const fileSize = stats.size;
+          const isComplete = fileSize >= config.expected_size * 0.95; // 允许5%误差
+          
+          results[modelType] = {
+            exists: true,
+            path: modelFile,
+            size: fileSize,
+            expected_size: config.expected_size,
+            complete: isComplete
+          };
+          
+          if (!isComplete) {
+            missingModels.push(modelType);
+          }
+        } else {
+          results[modelType] = {
+            exists: false,
+            path: modelFile,
+            size: 0,
+            expected_size: config.expected_size,
+            complete: false
+          };
+          missingModels.push(modelType);
+        }
+      }
+      
+      const allDownloaded = missingModels.length === 0;
+      this.modelsDownloaded = allDownloaded;
+      
+      this.logger.info && this.logger.info('模型检查完成:', {
+        allDownloaded,
+        missingModels,
+        details: results
+      });
+      
+      return {
+        success: true,
+        models_downloaded: allDownloaded,
+        missing_models: missingModels,
+        details: results
+      };
+      
+    } catch (error) {
+      this.logger.error && this.logger.error('检查模型文件失败:', error);
+      this.modelsDownloaded = false;
+      return {
+        success: false,
+        error: error.message,
+        models_downloaded: false,
+        missing_models: ["asr", "vad", "punc"],
+        details: {}
+      };
+    }
+  }
+
+  async getDownloadProgress() {
+    /**
+     * 获取模型下载进度
+     */
+    try {
+      const cachePath = this.getModelCachePath();
+      
+      if (!fs.existsSync(cachePath)) {
+        return {
+          success: true,
+          overall_progress: 0,
+          models: {
+            "asr": { progress: 0, downloaded: 0, total: this.modelConfigs.asr.expected_size },
+            "vad": { progress: 0, downloaded: 0, total: this.modelConfigs.vad.expected_size },
+            "punc": { progress: 0, downloaded: 0, total: this.modelConfigs.punc.expected_size }
+          }
+        };
+      }
+      
+      const totalExpected = Object.values(this.modelConfigs).reduce((sum, config) => sum + config.expected_size, 0);
+      let totalDownloaded = 0;
+      const modelProgress = {};
+      
+      for (const [modelType, config] of Object.entries(this.modelConfigs)) {
+        const modelDir = path.join(cachePath, config.cache_path);
+        const modelFile = path.join(modelDir, "model.pt");
+        
+        let fileSize = 0;
+        if (fs.existsSync(modelFile)) {
+          const stats = fs.statSync(modelFile);
+          fileSize = stats.size;
+          totalDownloaded += fileSize;
+        }
+        
+        const progress = Math.min(100, (fileSize / config.expected_size) * 100);
+        
+        modelProgress[modelType] = {
+          progress: Math.round(progress * 10) / 10, // 保留1位小数
+          downloaded: fileSize,
+          total: config.expected_size
+        };
+      }
+      
+      const overallProgress = Math.min(100, (totalDownloaded / totalExpected) * 100);
+      
+      return {
+        success: true,
+        overall_progress: Math.round(overallProgress * 10) / 10,
+        models: modelProgress
+      };
+      
+    } catch (error) {
+      this.logger.error && this.logger.error('获取下载进度失败:', error);
+      return {
+        success: false,
+        error: error.message,
+        overall_progress: 0,
+        models: {}
+      };
+    }
+  }
+
+  getDownloadScriptPath() {
+    /**
+     * 获取下载脚本路径
+     */
+    if (process.env.NODE_ENV === "development") {
+      return path.join(__dirname, "..", "..", "download_models.py");
+    } else {
+      return path.join(
+        process.resourcesPath,
+        "app.asar.unpacked",
+        "download_models.py"
+      );
+    }
+  }
+
+  async downloadModels(progressCallback = null) {
+    /**
+     * 下载模型文件（使用独立的Python脚本并行下载）
+     */
+    try {
+      this.logger.info && this.logger.info('开始下载FunASR模型...');
+      
+      // 先检查模型状态
+      const checkResult = await this.checkModelFiles();
+      if (checkResult.models_downloaded) {
+        this.logger.info && this.logger.info('模型已存在，无需下载');
+        return { success: true, message: "模型已存在，无需下载" };
+      }
+      
+      const pythonCmd = await this.findPythonExecutable();
+      const scriptPath = this.getDownloadScriptPath();
+      
+      this.logger.info && this.logger.info('启动模型下载脚本:', {
+        pythonCmd,
+        scriptPath,
+        scriptExists: fs.existsSync(scriptPath)
+      });
+      
+      if (!fs.existsSync(scriptPath)) {
+        throw new Error(`下载脚本未找到: ${scriptPath}`);
+      }
+      
+      return new Promise((resolve, reject) => {
+        const downloadProcess = spawn(pythonCmd, [scriptPath], {
+          stdio: ["pipe", "pipe", "pipe"],
+          windowsHide: true,
+          env: { ...process.env }
+        });
+        
+        let hasError = false;
+        
+        downloadProcess.stdout.on("data", (data) => {
+          const lines = data.toString().split('\n').filter(line => line.trim());
+          
+          for (const line of lines) {
+            try {
+              const result = JSON.parse(line);
+              
+              if (result.error) {
+                hasError = true;
+                reject(new Error(result.error));
+                return;
+              }
+              
+              // 处理进度更新
+              if (result.stage && progressCallback) {
+                progressCallback({
+                  stage: result.stage,
+                  model: result.model,
+                  progress: result.progress,
+                  overall_progress: result.overall_progress,
+                  completed: result.completed,
+                  total: result.total
+                });
+              }
+              
+              // 处理最终结果
+              if (result.success !== undefined) {
+                if (result.success) {
+                  this.modelsDownloaded = true;
+                  resolve({ success: true, message: result.message || "模型下载完成" });
+                } else {
+                  hasError = true;
+                  reject(new Error(result.error || "模型下载失败"));
+                }
+                return;
+              }
+              
+            } catch (parseError) {
+              // 忽略非JSON输出
+              this.logger.debug && this.logger.debug('下载脚本非JSON输出:', line);
+            }
+          }
+        });
+        
+        downloadProcess.stderr.on("data", (data) => {
+          const errorOutput = data.toString();
+          this.logger.error && this.logger.error('模型下载错误输出:', errorOutput);
+        });
+        
+        downloadProcess.on("close", (code) => {
+          if (!hasError) {
+            if (code === 0) {
+              this.modelsDownloaded = true;
+              resolve({ success: true, message: "模型下载完成" });
+            } else {
+              reject(new Error(`模型下载进程退出，代码: ${code}`));
+            }
+          }
+        });
+        
+        downloadProcess.on("error", (error) => {
+          if (!hasError) {
+            reject(new Error(`启动下载进程失败: ${error.message}`));
+          }
+        });
+        
+        // 设置超时（30分钟）
+        setTimeout(() => {
+          if (!hasError) {
+            downloadProcess.kill();
+            reject(new Error('模型下载超时'));
+          }
+        }, 30 * 60 * 1000);
+      });
+      
+    } catch (error) {
+      this.logger.error && this.logger.error('模型下载失败:', error);
+      throw error;
+    }
+  }
+
+  async restartServer() {
+    /**
+     * 重启FunASR服务器（用于模型下载完成后）
+     */
+    try {
+      this.logger.info && this.logger.info('重启FunASR服务器...');
+      
+      // 停止现有服务器
+      if (this.serverProcess) {
+        await this._stopFunASRServer();
+        this.logger.info && this.logger.info('已停止现有FunASR服务器');
+      }
+      
+      // 重置状态
+      this.serverReady = false;
+      this.modelsInitialized = false;
+      this.initializationPromise = null;
+      
+      // 检查模型文件状态
+      const modelStatus = await this.checkModelFiles();
+      if (!modelStatus.models_downloaded) {
+        throw new Error('模型文件未下载，无法启动服务器');
+      }
+      
+      // 重新启动服务器
+      this.initializationPromise = this._startFunASRServer();
+      await this.initializationPromise;
+      
+      this.logger.info && this.logger.info('FunASR服务器重启完成');
+      return { success: true, message: 'FunASR服务器重启成功' };
+      
+    } catch (error) {
+      this.logger.error && this.logger.error('重启FunASR服务器失败:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -559,10 +901,23 @@ class FunASRManager {
       } else {
         // 检查FunASR是否已安装
         const installStatus = await this.checkFunASRInstallation();
+        const modelStatus = await this.checkModelFiles();
+        
+        let error = "FunASR未安装";
+        if (installStatus.installed) {
+          if (!modelStatus.models_downloaded) {
+            error = "模型文件未下载，请先下载模型";
+          } else {
+            error = "FunASR服务器正在启动中...";
+          }
+        }
+        
         return {
-          success: installStatus.installed,
-          error: installStatus.installed ? "FunASR服务器正在启动中..." : "FunASR未安装",
+          success: installStatus.installed && modelStatus.models_downloaded,
+          error: error,
           installed: installStatus.installed,
+          models_downloaded: modelStatus.models_downloaded,
+          missing_models: modelStatus.missing_models || [],
           initializing: this.initializationPromise !== null
         };
       }
@@ -570,7 +925,8 @@ class FunASRManager {
       return {
         success: false,
         error: error.message,
-        installed: false
+        installed: false,
+        models_downloaded: false
       };
     }
   }

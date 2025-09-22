@@ -74,6 +74,21 @@ class IPCHandlers {
       return await this.funasrManager.checkStatus();
     });
 
+    // 模型文件管理
+    ipcMain.handle("check-model-files", async () => {
+      return await this.funasrManager.checkModelFiles();
+    });
+
+    ipcMain.handle("get-download-progress", async () => {
+      return await this.funasrManager.getDownloadProgress();
+    });
+
+    ipcMain.handle("download-models", async (event) => {
+      return await this.funasrManager.downloadModels((progress) => {
+        event.sender.send("model-download-progress", progress);
+      });
+    });
+
     // AI文本处理
     ipcMain.handle("process-text", async (event, text, mode = 'optimize') => {
       return await this.processTextWithAI(text, mode);
@@ -629,25 +644,58 @@ class IPCHandlers {
       return { success: true, data: audioData };
     });
 
-    // 模型管理
-    ipcMain.handle("download-model", (event, modelName) => {
-      // TODO: 实现模型下载功能
-      return { success: true };
+    // 模型管理 - 更新为实际功能
+    ipcMain.handle("download-model", async (event, modelName) => {
+      // 使用统一的模型下载功能
+      return await this.funasrManager.downloadModels((progress) => {
+        event.sender.send("model-download-progress", progress);
+      });
     });
 
     ipcMain.handle("get-available-models", () => {
-      // TODO: 实现获取可用模型功能
-      return { models: [] };
+      // 返回FunASR支持的模型列表
+      return {
+        models: [
+          {
+            name: "paraformer-large",
+            displayName: "Paraformer Large (ASR)",
+            type: "asr",
+            size: "840MB",
+            description: "大型中文语音识别模型"
+          },
+          {
+            name: "fsmn-vad",
+            displayName: "FSMN VAD",
+            type: "vad",
+            size: "1.6MB",
+            description: "语音活动检测模型"
+          },
+          {
+            name: "ct-transformer-punc",
+            displayName: "CT Transformer (标点)",
+            type: "punc",
+            size: "278MB",
+            description: "标点符号恢复模型"
+          }
+        ]
+      };
     });
 
-    ipcMain.handle("get-current-model", () => {
-      // TODO: 实现获取当前模型功能
-      return { model: "paraformer-large" };
+    ipcMain.handle("get-current-model", async () => {
+      const status = await this.funasrManager.checkStatus();
+      return {
+        model: "paraformer-large",
+        status: status.models_downloaded ? "ready" : "not_downloaded",
+        details: status
+      };
     });
 
     ipcMain.handle("switch-model", (event, modelName) => {
-      // TODO: 实现切换模型功能
-      return { success: true };
+      // FunASR目前使用固定模型组合，暂不支持切换
+      return {
+        success: false,
+        error: "FunASR使用固定模型组合，暂不支持切换单个模型"
+      };
     });
 
     // 性能监控
@@ -850,18 +898,10 @@ class IPCHandlers {
       try {
         this.logger && this.logger.info && this.logger.info('手动重启FunASR服务器');
         
-        // 停止现有服务器
-        if (this.funasrManager.serverProcess) {
-          await this.funasrManager._stopFunASRServer();
-        }
+        // 使用新的restartServer方法
+        const result = await this.funasrManager.restartServer();
         
-        // 重新启动
-        await this.funasrManager.preInitializeModels();
-        
-        return {
-          success: true,
-          message: 'FunASR服务器重启完成'
-        };
+        return result;
       } catch (error) {
         this.logger && this.logger.error && this.logger.error('重启FunASR服务器失败', error);
         return {
