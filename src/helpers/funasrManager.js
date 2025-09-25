@@ -69,66 +69,94 @@ class FunASRManager {
   }
 
   setupIsolatedEnvironment() {
-    // 设置完全隔离的Python环境变量
-    const pythonPath = this.getEmbeddedPythonPath();
-    const pythonHome = path.dirname(path.dirname(pythonPath));
-    const sitePackages = path.join(pythonHome, 'lib', 'python3.11', 'site-packages');
+    // 设置Python环境变量，根据实际使用的Python来决定
+    const embeddedPythonPath = this.getEmbeddedPythonPath();
+    const isUsingEmbedded = fs.existsSync(embeddedPythonPath);
     
-    // 设置Python环境变量
-    process.env.PYTHONHOME = pythonHome;
-    process.env.PYTHONPATH = sitePackages;
-    process.env.PYTHONDONTWRITEBYTECODE = '1';  // 不生成.pyc文件
-    process.env.PYTHONIOENCODING = 'utf-8';
-    process.env.PYTHONUNBUFFERED = '1';  // 确保输出不被缓冲
+    if (isUsingEmbedded) {
+      // 使用嵌入式Python时设置完全隔离的环境变量
+      const pythonHome = path.dirname(path.dirname(embeddedPythonPath));
+      const sitePackages = path.join(pythonHome, 'lib', 'python3.11', 'site-packages');
+      
+      process.env.PYTHONHOME = pythonHome;
+      process.env.PYTHONPATH = sitePackages;
+      process.env.PYTHONDONTWRITEBYTECODE = '1';
+      process.env.PYTHONIOENCODING = 'utf-8';
+      process.env.PYTHONUNBUFFERED = '1';
+      
+      this.logger.info && this.logger.info('设置嵌入式Python环境', {
+        PYTHONHOME: process.env.PYTHONHOME,
+        PYTHONPATH: process.env.PYTHONPATH,
+        pythonExecutable: embeddedPythonPath
+      });
+    } else {
+      // 使用系统Python时，清除可能干扰的嵌入式Python环境变量
+      delete process.env.PYTHONHOME;
+      delete process.env.PYTHONPATH;
+      
+      // 设置基础环境变量
+      process.env.PYTHONDONTWRITEBYTECODE = '1';
+      process.env.PYTHONIOENCODING = 'utf-8';
+      process.env.PYTHONUNBUFFERED = '1';
+      
+      this.logger.info && this.logger.info('设置系统Python环境', {
+        note: '清除嵌入式Python环境变量，使用系统Python默认环境',
+        pythonExecutable: this.pythonCmd || '未确定'
+      });
+    }
     
     // 清除可能干扰的系统Python环境变量
     delete process.env.PYTHONUSERBASE;
     delete process.env.PYTHONSTARTUP;
     delete process.env.VIRTUAL_ENV;
-    
-    this.logger.info && this.logger.info('设置嵌入式Python环境', {
-      PYTHONHOME: process.env.PYTHONHOME,
-      PYTHONPATH: process.env.PYTHONPATH,
-      pythonExecutable: pythonPath
-    });
   }
 
   buildPythonEnvironment() {
-    // 构建完整的Python环境变量，确保嵌入式Python能正确找到所有依赖
-    const pythonPath = this.getEmbeddedPythonPath();
-    const pythonHome = path.dirname(path.dirname(pythonPath));
-    const sitePackages = path.join(pythonHome, 'lib', 'python3.11', 'site-packages');
+    // 构建完整的Python环境变量，根据实际使用的Python路径来配置
+    const embeddedPythonPath = this.getEmbeddedPythonPath();
+    const isUsingEmbedded = fs.existsSync(embeddedPythonPath);
     
-    // 构建完整的环境变量
-    const env = {
+    let env = {
       ...process.env,
-      // Python核心环境变量
-      PYTHONHOME: pythonHome,
-      PYTHONPATH: sitePackages,
+      // 基础Python环境变量
       PYTHONDONTWRITEBYTECODE: '1',
       PYTHONIOENCODING: 'utf-8',
       PYTHONUNBUFFERED: '1',
-      
-      // 确保库路径正确
-      LD_LIBRARY_PATH: path.join(pythonHome, 'lib'),
-      DYLD_LIBRARY_PATH: path.join(pythonHome, 'lib'), // macOS
       
       // 设置用户数据目录用于日志
       ELECTRON_USER_DATA: require('electron').app.getPath('userData')
     };
     
+    if (isUsingEmbedded) {
+      // 使用嵌入式Python时的完整隔离环境
+      const pythonHome = path.dirname(path.dirname(embeddedPythonPath));
+      const sitePackages = path.join(pythonHome, 'lib', 'python3.11', 'site-packages');
+      
+      env.PYTHONHOME = pythonHome;
+      env.PYTHONPATH = sitePackages;
+      env.LD_LIBRARY_PATH = path.join(pythonHome, 'lib');
+      env.DYLD_LIBRARY_PATH = path.join(pythonHome, 'lib'); // macOS
+      
+      this.logger.info && this.logger.info('构建嵌入式Python环境变量', {
+        PYTHONHOME: env.PYTHONHOME,
+        PYTHONPATH: env.PYTHONPATH,
+        LD_LIBRARY_PATH: env.LD_LIBRARY_PATH,
+        DYLD_LIBRARY_PATH: env.DYLD_LIBRARY_PATH,
+        pythonExecutable: embeddedPythonPath
+      });
+    } else {
+      // 使用系统Python时，清除可能干扰的嵌入式Python环境变量
+      // 不设置PYTHONHOME和PYTHONPATH，让系统Python使用自己的环境
+      this.logger.info && this.logger.info('构建系统Python环境变量', {
+        note: '使用系统Python默认环境',
+        pythonExecutable: this.pythonCmd || '未确定'
+      });
+    }
+    
     // 清除可能干扰的系统Python环境变量
     delete env.PYTHONUSERBASE;
     delete env.PYTHONSTARTUP;
     delete env.VIRTUAL_ENV;
-    
-    this.logger.info && this.logger.info('构建Python环境变量', {
-      PYTHONHOME: env.PYTHONHOME,
-      PYTHONPATH: env.PYTHONPATH,
-      LD_LIBRARY_PATH: env.LD_LIBRARY_PATH,
-      DYLD_LIBRARY_PATH: env.DYLD_LIBRARY_PATH,
-      pythonExecutable: pythonPath
-    });
     
     return env;
   }
