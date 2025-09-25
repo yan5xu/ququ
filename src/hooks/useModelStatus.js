@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 
+// 检查是否为控制面板或设置页面
+const isControlPanelOrSettings = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('panel') === 'control' || urlParams.get('page') === 'settings';
+};
+
 /**
  * 模型状态监控Hook
  * 监控FunASR模型的下载、加载状态
@@ -225,17 +231,28 @@ export const useModelStatus = () => {
 
   // 初始化时检查状态
   useEffect(() => {
-    checkModelStatus();
+    if (isControlPanelOrSettings()) {
+      console.log('控制面板或设置页面，跳过模型状态检查');
+      return;
+    }
     
-    // 设置定期检查（仅在模型未就绪时）
+    checkModelStatus();
+  }, [checkModelStatus]);
+
+  // 设置定期检查（仅在主窗口且模型未就绪时）
+  useEffect(() => {
+    if (isControlPanelOrSettings() || modelStatus.isReady || modelStatus.isDownloading) {
+      return;
+    }
+
     const interval = setInterval(() => {
       if (!modelStatus.isReady && !modelStatus.isDownloading) {
         checkModelStatus();
       }
-    }, 3000); // 每3秒检查一次
+    }, 3000); // 减少间隔，确保及时检测到状态变化
 
     return () => clearInterval(interval);
-  }, [checkModelStatus, modelStatus.isReady, modelStatus.isDownloading]);
+  }, [modelStatus.isReady, modelStatus.isDownloading, checkModelStatus]);
 
   // 监听下载进度事件
   useEffect(() => {

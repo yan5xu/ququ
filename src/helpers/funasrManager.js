@@ -6,6 +6,11 @@ const os = require("os");
 const PythonInstaller = require("./pythonInstaller");
 const { runCommand, TIMEOUTS } = require("../utils/process");
 
+// 简单的全局缓存，避免频繁检查
+let globalModelCheckCache = null;
+let globalModelCheckTime = 0;
+const GLOBAL_CACHE_TIME = 2000; // 减少到2秒缓存，确保及时更新
+
 class FunASRManager {
   constructor(logger = null) {
     this.logger = logger || console; // 使用传入的logger或默认console
@@ -18,6 +23,10 @@ class FunASRManager {
     this.serverProcess = null; // FunASR服务器进程
     this.serverReady = false; // 服务器是否就绪
     this.modelsDownloaded = null; // 缓存模型下载状态
+    
+    // 简化缓存
+    this._cachedPythonEnv = null;
+    this._lastEmbeddedCheck = null;
     
     // 模型配置
     this.modelConfigs = {
@@ -116,6 +125,11 @@ class FunASRManager {
     const embeddedPythonPath = this.getEmbeddedPythonPath();
     const isUsingEmbedded = fs.existsSync(embeddedPythonPath);
     
+    // 缓存环境变量，避免重复构建和日志输出
+    if (this._cachedPythonEnv && this._lastEmbeddedCheck === isUsingEmbedded) {
+      return this._cachedPythonEnv;
+    }
+    
     let env = {
       ...process.env,
       // 基础Python环境变量
@@ -137,26 +151,35 @@ class FunASRManager {
       env.LD_LIBRARY_PATH = path.join(pythonHome, 'lib');
       env.DYLD_LIBRARY_PATH = path.join(pythonHome, 'lib'); // macOS
       
-      this.logger.info && this.logger.info('构建嵌入式Python环境变量', {
-        PYTHONHOME: env.PYTHONHOME,
-        PYTHONPATH: env.PYTHONPATH,
-        LD_LIBRARY_PATH: env.LD_LIBRARY_PATH,
-        DYLD_LIBRARY_PATH: env.DYLD_LIBRARY_PATH,
-        pythonExecutable: embeddedPythonPath
-      });
+      // 只在首次构建或环境变化时记录日志
+      if (!this._cachedPythonEnv || this._lastEmbeddedCheck !== isUsingEmbedded) {
+        this.logger.info && this.logger.info('构建嵌入式Python环境变量', {
+          PYTHONHOME: env.PYTHONHOME,
+          PYTHONPATH: env.PYTHONPATH,
+          LD_LIBRARY_PATH: env.LD_LIBRARY_PATH,
+          DYLD_LIBRARY_PATH: env.DYLD_LIBRARY_PATH,
+          pythonExecutable: embeddedPythonPath
+        });
+      }
     } else {
       // 使用系统Python时，清除可能干扰的嵌入式Python环境变量
       // 不设置PYTHONHOME和PYTHONPATH，让系统Python使用自己的环境
-      this.logger.info && this.logger.info('构建系统Python环境变量', {
-        note: '使用系统Python默认环境',
-        pythonExecutable: this.pythonCmd || '未确定'
-      });
+      if (!this._cachedPythonEnv || this._lastEmbeddedCheck !== isUsingEmbedded) {
+        this.logger.info && this.logger.info('构建系统Python环境变量', {
+          note: '使用系统Python默认环境',
+          pythonExecutable: this.pythonCmd || '未确定'
+        });
+      }
     }
     
     // 清除可能干扰的系统Python环境变量
     delete env.PYTHONUSERBASE;
     delete env.PYTHONSTARTUP;
     delete env.VIRTUAL_ENV;
+    
+    // 缓存结果
+    this._cachedPythonEnv = env;
+    this._lastEmbeddedCheck = isUsingEmbedded;
     
     return env;
   }
@@ -171,8 +194,17 @@ class FunASRManager {
 
   async checkModelFiles() {
     /**
-     * 检查所有模型文件是否存在
+     * 检查所有模型文件是否存在（使用简单缓存避免频繁检查）
      */
+    const now = Date.now();
+    
+    // 使用全局缓存避免频繁检查，但如果服务器状态可能已变化则强制检查
+    if (globalModelCheckCache &&
+        (now - globalModelCheckTime) < GLOBAL_CACHE_TIME &&
+        !this.serverReady) { // 如果服务器已就绪，允许重新检查
+      return globalModelCheckCache;
+    }
+    
     try {
       const cachePath = this.getModelCachePath();
       this.logger.info && this.logger.info('检查模型缓存路径:', cachePath);
@@ -180,12 +212,17 @@ class FunASRManager {
       if (!fs.existsSync(cachePath)) {
         this.logger.info && this.logger.info('模型缓存目录不存在');
         this.modelsDownloaded = false;
-        return {
+        const result = {
           success: true,
           models_downloaded: false,
           missing_models: ["asr", "vad", "punc"],
           details: {}
         };
+        
+        // 更新全局缓存
+        globalModelCheckCache = result;
+        globalModelCheckTime = now;
+        return result;
       }
       
       const results = {};
@@ -232,23 +269,31 @@ class FunASRManager {
         details: results
       });
       
-      return {
+      const result = {
         success: true,
         models_downloaded: allDownloaded,
         missing_models: missingModels,
         details: results
       };
       
+      // 更新全局缓存
+      globalModelCheckCache = result;
+      globalModelCheckTime = now;
+      return result;
+      
     } catch (error) {
       this.logger.error && this.logger.error('检查模型文件失败:', error);
       this.modelsDownloaded = false;
-      return {
+      const result = {
         success: false,
         error: error.message,
         models_downloaded: false,
         missing_models: ["asr", "vad", "punc"],
         details: {}
       };
+      
+      // 错误情况下不缓存，允许重试
+      return result;
     }
   }
 
@@ -462,10 +507,11 @@ class FunASRManager {
         this.logger.info && this.logger.info('已停止现有FunASR服务器');
       }
       
-      // 重置状态
+      // 重置状态并清除缓存
       this.serverReady = false;
       this.modelsInitialized = false;
       this.initializationPromise = null;
+      this._clearModelCache();
       
       // 检查模型文件状态
       const modelStatus = await this.checkModelFiles();
@@ -484,6 +530,14 @@ class FunASRManager {
       this.logger.error && this.logger.error('重启FunASR服务器失败:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  _clearModelCache() {
+    /**
+     * 清除模型检查缓存
+     */
+    globalModelCheckCache = null;
+    globalModelCheckTime = 0;
   }
 
   async initializeAtStartup() {
@@ -577,6 +631,7 @@ class FunASRManager {
                 if (result.success) {
                   this.serverReady = true;
                   this.modelsInitialized = true;
+                  this._clearModelCache(); // 清除缓存，确保状态更新
                   this.logger.info && this.logger.info('FunASR服务器启动成功，模型已初始化');
                 } else {
                   this.logger.error && this.logger.error('FunASR服务器初始化失败', result);
