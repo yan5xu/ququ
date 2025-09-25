@@ -72,20 +72,77 @@
 - **Python 3.8+** (用于运行本地FunASR服务)
 - **macOS 10.15+**, **Windows 10+**, 或 **Linux**
 
-### 2. 安装与配置
+### 2. 项目初始化
+
+#### 方案一：使用 uv (推荐) 🌟
+
+[uv](https://github.com/astral-sh/uv) 是现代化的 Python 包管理器，能自动管理 Python 版本和依赖，避免环境冲突：
 
 ```bash
 # 1. 克隆项目
 git clone https://github.com/yan5xu/ququ.git
 cd ququ
 
-# 2. 安装依赖
+# 2. 安装 Node.js 依赖
 pnpm install
 
-# 3. 安装FunASR环境 (本地语音识别核心)
-pip install funasr modelscope
+# 3. 安装 uv (如果尚未安装)
+# macOS/Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# Windows:
+# powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# 4. 启动应用!
+# 4. 初始化 Python 环境 (uv 会自动下载 Python 3.11 和所有依赖)
+uv sync
+
+# 5. 下载 FunASR 模型
+uv run python download_models.py
+
+# 6. 启动应用!
+pnpm run dev
+```
+
+#### 方案二：使用系统 Python
+
+如果您更喜欢使用系统 Python 环境：
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/yan5xu/ququ.git
+cd ququ
+
+# 2. 安装 Node.js 依赖
+pnpm install
+
+# 3. 创建虚拟环境 (推荐)
+python3 -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# .venv\Scripts\activate   # Windows
+
+# 4. 安装 Python 依赖
+pip install funasr modelscope torch torchaudio librosa numpy
+
+# 5. 下载 FunASR 模型
+python download_models.py
+
+# 6. 启动应用!
+pnpm run dev
+```
+
+#### 方案三：使用嵌入式 Python 环境
+
+项目还支持完全隔离的嵌入式 Python 环境（主要用于生产构建）：
+
+```bash
+# 1-2. 同上克隆项目和安装 Node.js 依赖
+
+# 3. 准备嵌入式 Python 环境
+pnpm run prepare:python
+
+# 4. 测试环境是否正常
+pnpm run test:python
+
+# 5. 启动应用
 pnpm run dev
 ```
 
@@ -94,20 +151,55 @@ pnpm run dev
 
 ### 4. 故障排除
 
-#### FunASR模型加载缓慢问题
+#### 常见初始化问题
 
-如果您在macOS上遇到SSL兼容性警告导致模型加载变慢，可以通过以下命令修复：
-
+**问题**: `ModuleNotFoundError: No module named 'funasr'`
 ```bash
-# 修复urllib3兼容性问题，提升模型加载速度
-python3 -m pip install "urllib3<2.0"
+# 解决方案 1: 使用 uv (推荐)
+uv sync
+uv run python download_models.py
+
+# 解决方案 2: 重新安装依赖
+pip install funasr modelscope torch torchaudio librosa numpy
+
+# 解决方案 3: 使用嵌入式环境
+pnpm run prepare:python
 ```
+
+**问题**: FunASR 模型下载失败或加载缓慢
+```bash
+# 检查网络连接，确保能访问 modelscope.cn
+# 如果在 macOS 上遇到 SSL 警告：
+pip install "urllib3<2.0"
+
+# 手动下载模型：
+python download_models.py
+# 或使用 uv:
+uv run python download_models.py
+```
+
+**问题**: Python 版本不兼容
+```bash
+# 使用 uv 自动管理 Python 版本 (推荐)
+uv sync  # 会自动下载 Python 3.11
+
+# 或手动安装 Python 3.8+
+# 检查当前版本: python3 --version
+```
+
+#### 环境选择建议
+
+| 使用场景 | 推荐方案 | 优点 |
+|---------|---------|------|
+| **新用户/快速体验** | uv | 自动管理，无环境冲突 |
+| **开发者/自定义需求** | 系统 Python + 虚拟环境 | 灵活控制，便于调试 |
+| **生产部署** | 嵌入式环境 | 完全隔离，无外部依赖 |
 
 #### 其他常见问题
 
-- **Python环境问题**: 确保使用Python 3.8+版本
 - **权限问题**: 在某些系统上可能需要使用 `--user` 参数安装Python包
 - **网络问题**: 首次运行时需要下载FunASR模型，请确保网络连接正常
+- **模型路径**: 模型默认下载到 `~/.cache/modelscope/` 目录
 
 ## 🛠️ 技术栈
 
