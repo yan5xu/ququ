@@ -2,6 +2,12 @@
 
 此文件为在此代码库中工作的AI助手提供指导。
 
+## 项目管理
+
+- **GitHub Project**: https://github.com/users/yan5xu/projects/2
+- 所有任务、功能开发和Bug跟踪都在项目看板中管理
+- 开发进度和里程碑规划可在项目看板中查看
+
 ## 非标准构建命令
 
 - `pnpm run dev` - 同时运行渲染进程(Vite)和主进程(Electron)
