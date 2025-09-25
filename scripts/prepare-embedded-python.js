@@ -14,22 +14,48 @@ class EmbeddedPythonBuilder {
     this.pythonVersion = '3.11.6';
     this.buildDate = '20231002';
     this.pythonDir = path.join(__dirname, '..', 'python');
+    this.forceReinstall = false;
   }
 
   async build() {
     console.log('🐍 开始准备嵌入式Python环境...');
     
     try {
-      // 1. 清理现有Python目录
+      // 1. 检查现有环境是否完整（除非强制重新安装）
+      if (!this.forceReinstall) {
+        const existingInfo = await this.getEmbeddedPythonInfo();
+        if (existingInfo && existingInfo.ready) {
+          console.log('✅ 检测到现有的嵌入式Python环境:');
+          console.log(`   版本: ${existingInfo.version}`);
+          console.log(`   大小: ${existingInfo.size.mb}MB (${existingInfo.size.files} 个文件)`);
+          
+          // 验证关键依赖是否完整
+          const pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+          const isValid = await this.validateExistingEnvironment(pythonPath);
+          
+          if (isValid) {
+            console.log('✅ 现有环境验证通过，跳过重新安装');
+            return;
+          } else {
+            console.log('⚠️ 现有环境不完整，将重新安装...');
+          }
+        } else {
+          console.log('📋 未检测到现有环境或环境不可用，开始全新安装...');
+        }
+      } else {
+        console.log('🔄 强制重新安装模式，跳过现有环境检查');
+      }
+      
+      // 2. 清理现有Python目录
       await this.cleanup();
       
-      // 2. 下载Python运行时
+      // 3. 下载Python运行时
       await this.downloadPythonRuntime();
       
-      // 3. 安装Python依赖
+      // 4. 安装Python依赖
       await this.installDependencies();
       
-      // 4. 清理不必要文件
+      // 5. 清理不必要文件
       await this.cleanupUnnecessaryFiles();
       
       console.log('✅ 嵌入式Python环境准备完成！');
@@ -263,6 +289,60 @@ class EmbeddedPythonBuilder {
     }
   }
 
+  async validateExistingEnvironment(pythonPath) {
+    console.log('🔍 验证现有环境完整性...');
+    
+    try {
+      // 检查Python可执行文件是否存在
+      if (!fs.existsSync(pythonPath)) {
+        console.log('❌ Python可执行文件不存在');
+        return false;
+      }
+      
+      // 检查关键依赖是否可用
+      const criticalDeps = ['numpy', 'torch', 'librosa', 'funasr'];
+      const sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+      
+      // 构建环境变量
+      const verifyEnv = {
+        ...process.env,
+        PYTHONHOME: this.pythonDir,
+        PYTHONPATH: sitePackagesPath,
+        PYTHONDONTWRITEBYTECODE: '1',
+        PYTHONIOENCODING: 'utf-8',
+        PYTHONUNBUFFERED: '1',
+        LD_LIBRARY_PATH: path.join(this.pythonDir, 'lib'),
+        DYLD_LIBRARY_PATH: path.join(this.pythonDir, 'lib'),
+      };
+      
+      // 清除可能干扰的环境变量
+      delete verifyEnv.PYTHONUSERBASE;
+      delete verifyEnv.PYTHONSTARTUP;
+      delete verifyEnv.VIRTUAL_ENV;
+      
+      for (const dep of criticalDeps) {
+        try {
+          execSync(`"${pythonPath}" -c "import ${dep}; print('${dep} OK')"`, {
+            stdio: 'pipe',
+            env: verifyEnv,
+            timeout: 10000 // 10秒超时
+          });
+          console.log(`✅ ${dep} 可用`);
+        } catch (error) {
+          console.log(`❌ ${dep} 不可用: ${error.message}`);
+          return false;
+        }
+      }
+      
+      console.log('✅ 现有环境验证完成，所有关键依赖都可用');
+      return true;
+      
+    } catch (error) {
+      console.log(`❌ 环境验证失败: ${error.message}`);
+      return false;
+    }
+  }
+
   async cleanupUnnecessaryFiles() {
     console.log('🧹 清理不必要文件...');
     
@@ -382,6 +462,12 @@ async function main() {
     const info = await builder.getEmbeddedPythonInfo();
     console.log('嵌入式Python信息:', JSON.stringify(info, null, 2));
     return;
+  }
+  
+  // 检查是否强制重新安装
+  if (process.argv.includes('--force')) {
+    console.log('🔄 强制重新安装模式');
+    builder.forceReinstall = true;
   }
   
   await builder.build();
