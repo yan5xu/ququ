@@ -5,13 +5,15 @@ import { toast, Toaster } from "sonner";
 import { Settings, Save, Eye, EyeOff, X, Loader2, TestTube, CheckCircle, XCircle, Mic, Shield } from "lucide-react";
 import { usePermissions } from "./hooks/usePermissions";
 import PermissionCard from "./components/ui/permission-card";
+import HotkeySettings from "./components/HotkeySettings";
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({
     ai_api_key: "",
     ai_base_url: "https://api.openai.com/v1",
     ai_model: "gpt-3.5-turbo",
-    enable_ai_optimization: true
+    enable_ai_optimization: true,
+    hotkey: "CommandOrControl+Shift+Space"
   });
   
   const [customModel, setCustomModel] = useState(false);
@@ -47,11 +49,13 @@ const SettingsPage = () => {
       setLoading(true);
       if (window.electronAPI) {
         const allSettings = await window.electronAPI.getAllSettings();
+        const savedHotkey = await window.electronAPI.getSavedHotkey();
         const loadedSettings = {
           ai_api_key: allSettings.ai_api_key || "",
           ai_base_url: allSettings.ai_base_url || "https://api.openai.com/v1",
           ai_model: allSettings.ai_model || "gpt-3.5-turbo",
-          enable_ai_optimization: allSettings.enable_ai_optimization !== false // 默认为true
+          enable_ai_optimization: allSettings.enable_ai_optimization !== false, // 默认为true
+          hotkey: savedHotkey || "CommandOrControl+Shift+Space"
         };
         setSettings(prev => ({ ...prev, ...loadedSettings }));
         
@@ -77,6 +81,7 @@ const SettingsPage = () => {
         await window.electronAPI.setSetting('ai_base_url', settings.ai_base_url);
         await window.electronAPI.setSetting('ai_model', settings.ai_model);
         await window.electronAPI.setSetting('enable_ai_optimization', settings.enable_ai_optimization);
+        await window.electronAPI.saveHotkey(settings.hotkey); // 保存热键设置
         
         toast.success("设置保存成功");
       }
@@ -242,6 +247,36 @@ const SettingsPage = () => {
                   buttonText="测试权限"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* 热键设置部分 */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
+            <div className="p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 chinese-title">
+                  热键设置
+                </h2>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  设置用于语音转文字的全局快捷键
+                </p>
+              </div>
+              
+              <HotkeySettings
+                initialHotkey={settings.hotkey || 'CommandOrControl+Shift+Space'}
+                onSave={async (newHotkey) => {
+                  try {
+                    if (window.electronAPI) {
+                      await window.electronAPI.saveHotkey(newHotkey);
+                      setSettings(prev => ({ ...prev, hotkey: newHotkey }));
+                      toast.success('热键设置保存成功，将在下次启动或重新加载后生效');
+                    }
+                  } catch (error) {
+                    console.error('保存热键失败:', error);
+                    toast.error('保存热键失败');
+                  }
+                }}
+              />
             </div>
           </div>
 

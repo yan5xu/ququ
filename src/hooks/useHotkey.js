@@ -31,12 +31,12 @@ export const useHotkey = () => {
 
   // 移除F2双击相关的复杂逻辑，专注于传统热键
 
-  // 注册传统热键 - 添加防重复注册机制
+  // 注册传统热键
   const registerHotkey = async (newHotkey) => {
     try {
-      // 防重复注册：如果已经注册了相同的热键，直接返回成功
-      if (registeredHotkeyRef.current === newHotkey && isRegistered) {
-        console.log(`热键 ${newHotkey} 已注册，跳过重复注册`);
+      // 防止重复注册相同的热键
+      if (registeredHotkeyRef.current === newHotkey) {
+        console.log(`热键 ${newHotkey} 已经注册，跳过重复注册`);
         return true;
       }
 

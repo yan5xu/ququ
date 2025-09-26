@@ -440,7 +440,7 @@ export default function App() {
   }, [modelStatus, isRecording, isRecordingProcessing, startRecording, stopRecording]);
 
   // 使用热键Hook，不再使用F2双击功能
-  const { hotkey, syncRecordingState, registerHotkey } = useHotkey();
+  const { hotkey, rawHotkey, syncRecordingState, registerHotkey } = useHotkey();
 
   // 注册传统热键监听 - 只在主窗口注册，避免重复
   useEffect(() => {
@@ -456,10 +456,11 @@ export default function App() {
 
     const initializeHotkey = async () => {
       try {
-        // 注册默认热键 CommandOrControl+Shift+Space
-        const success = await registerHotkey('CommandOrControl+Shift+Space');
+        // 获取并注册热键
+        const currentHotkey = await window.electronAPI.getCurrentHotkey();
+        const success = await registerHotkey(currentHotkey);
         if (success) {
-          console.log('主窗口热键注册成功');
+          console.log('主窗口热键注册成功:', currentHotkey);
         } else {
           console.error('主窗口热键注册失败');
         }
@@ -468,10 +469,8 @@ export default function App() {
       }
     };
 
-    if (registerHotkey) {
-      initializeHotkey();
-    }
-  }, [registerHotkey]);
+    initializeHotkey();
+  }, []); // 只在组件挂载时执行一次
 
   // 处理关闭窗口
   const handleClose = () => {
@@ -508,6 +507,26 @@ export default function App() {
         toggleRecording();
       });
 
+      // 监听热键变化事件
+      const unsubscribeHotkeyChanged = window.electronAPI.onHotkeyChanged(async (event, data) => {
+        console.log('收到热键变化事件，重新初始化热键:', data);
+        try {
+          // 重新注册热键
+          if (window.electronAPI) {
+            const newHotkey = data.hotkey;
+            if (newHotkey) {
+              // 注册新热键（内部会先注销之前的热键）
+              const success = await registerHotkey(newHotkey);
+              if (success) {
+                console.log('热键已更新:', newHotkey);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('更新热键失败:', error);
+        }
+      });
+
       // 监听旧的toggle事件（保持兼容性）
       const unsubscribeToggle = window.electronAPI.onToggleDictation(() => {
         console.log('收到旧版toggle事件');
@@ -517,10 +536,11 @@ export default function App() {
 
       return () => {
         if (unsubscribeHotkey) unsubscribeHotkey();
+        if (unsubscribeHotkeyChanged) unsubscribeHotkeyChanged();
         if (unsubscribeToggle) unsubscribeToggle();
       };
     }
-  }, [toggleRecording, isRecording, isRecordingProcessing]);
+  }, [toggleRecording, isRecording, isRecordingProcessing, registerHotkey]);
 
   // 同步录音状态到热键管理器
   useEffect(() => {

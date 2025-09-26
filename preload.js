@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   registerHotkey: (hotkey) => ipcRenderer.invoke("register-hotkey", hotkey),
   unregisterHotkey: (hotkey) => ipcRenderer.invoke("unregister-hotkey", hotkey),
   getCurrentHotkey: () => ipcRenderer.invoke("get-current-hotkey"),
+  getSavedHotkey: () => ipcRenderer.invoke("get-saved-hotkey"),
+  saveHotkey: (hotkey) => ipcRenderer.invoke("save-hotkey", hotkey),
   
   // F2热键管理
   registerF2Hotkey: () => ipcRenderer.invoke("register-f2-hotkey"),
@@ -76,6 +78,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onHotkeyTriggered: (callback) => {
     ipcRenderer.on("hotkey-triggered", callback);
     return () => ipcRenderer.removeListener("hotkey-triggered", callback);
+  },
+  
+  // 热键变化事件监听
+  onHotkeyChanged: (callback) => {
+    ipcRenderer.on("hotkey-changed", callback);
+    return () => ipcRenderer.removeListener("hotkey-changed", callback);
   },
 
   // 文件操作

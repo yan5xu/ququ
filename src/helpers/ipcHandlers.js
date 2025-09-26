@@ -314,10 +314,11 @@ class IPCHandlers {
         if (this.hotkeyManager) {
           const senderId = event.sender.id;
           
-          // 检查是否已经为这个发送者注册过热键
-          if (this.hotkeyRegisteredSenders.has(senderId)) {
-            this.logger.info(`发送者 ${senderId} 已注册过热键，跳过重复注册`);
-            return { success: true };
+          // 注销之前可能已注册的热键
+          const registeredHotkeys = this.hotkeyManager.getRegisteredHotkeys();
+          const mainHotkey = registeredHotkeys.find(key => key !== 'F2');
+          if (mainHotkey) {
+            this.hotkeyManager.unregisterHotkey(mainHotkey);
           }
           
           const success = this.hotkeyManager.registerHotkey(hotkey, () => {
@@ -329,21 +330,12 @@ class IPCHandlers {
           });
           
           if (success) {
-            // 添加发送者到跟踪列表
-            this.hotkeyRegisteredSenders.add(senderId);
-            
-            // 监听窗口关闭事件，清理注册记录
-            event.sender.on('destroyed', () => {
-              this.hotkeyRegisteredSenders.delete(senderId);
-              this.logger.info(`清理发送者 ${senderId} 的热键注册记录`);
-            });
-            
             this.logger.info(`热键 ${hotkey} 注册成功，发送者: ${senderId}`);
+            return { success: true };
           } else {
             this.logger.error(`热键 ${hotkey} 注册失败`);
+            return { success: false };
           }
-          
-          return { success };
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
@@ -365,9 +357,16 @@ class IPCHandlers {
       }
     });
 
-    ipcMain.handle("get-current-hotkey", () => {
+    ipcMain.handle("get-current-hotkey", async () => {
       try {
         if (this.hotkeyManager) {
+          // 首先从数据库获取用户设置的热键
+          const savedHotkey = await this.databaseManager.getSetting('hotkey');
+          
+          if (savedHotkey) {
+            return savedHotkey;
+          }
+          
           const hotkeys = this.hotkeyManager.getRegisteredHotkeys();
           // 返回第一个非F2的热键，或默认热键
           const mainHotkey = hotkeys.find(key => key !== 'F2') || "CommandOrControl+Shift+Space";
@@ -376,6 +375,43 @@ class IPCHandlers {
         return "CommandOrControl+Shift+Space";
       } catch (error) {
         this.logger.error("获取当前热键失败:", error);
+        return "CommandOrControl+Shift+Space";
+      }
+    });
+
+    // 保存热键设置
+    ipcMain.handle("save-hotkey", async (event, hotkey) => {
+      try {
+        if (this.databaseManager) {
+          await this.databaseManager.setSetting('hotkey', hotkey);
+          
+          // 广播热键变更事件
+          const windows = require("electron").BrowserWindow.getAllWindows();
+          windows.forEach(window => {
+            if (!window.isDestroyed()) {
+              window.webContents.send("hotkey-changed", { hotkey });
+            }
+          });
+          
+          return { success: true };
+        }
+        return { success: false, error: "数据库管理器未初始化" };
+      } catch (error) {
+        this.logger.error("保存热键失败:", error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // 获取保存的热键
+    ipcMain.handle("get-saved-hotkey", async () => {
+      try {
+        if (this.databaseManager) {
+          const savedHotkey = await this.databaseManager.getSetting('hotkey');
+          return savedHotkey || "CommandOrControl+Shift+Space";
+        }
+        return "CommandOrControl+Shift+Space";
+      } catch (error) {
+        this.logger.error("获取保存的热键失败:", error);
         return "CommandOrControl+Shift+Space";
       }
     });
