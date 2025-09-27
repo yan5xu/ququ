@@ -151,3 +151,5 @@ temp/
 .gyprc
 
 python
+true/_update-notifier-last-checked
+.claude/settings.local.json

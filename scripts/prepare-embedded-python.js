@@ -11,8 +11,8 @@ const pipelineAsync = promisify(pipeline);
 
 class EmbeddedPythonBuilder {
   constructor() {
-    this.pythonVersion = '3.11.6';
-    this.buildDate = '20231002';
+    this.pythonVersion = '3.11.10';
+    this.buildDate = '20241016';
     this.pythonDir = path.join(__dirname, '..', 'python');
     this.forceReinstall = false;
   }
@@ -30,7 +30,12 @@ class EmbeddedPythonBuilder {
           console.log(`   大小: ${existingInfo.size.mb}MB (${existingInfo.size.files} 个文件)`);
           
           // 验证关键依赖是否完整
-          const pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+          let pythonPath;
+          if (process.platform === 'win32') {
+            pythonPath = path.join(this.pythonDir, 'python.exe');
+          } else {
+            pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+          }
           const isValid = await this.validateExistingEnvironment(pythonPath);
           
           if (isValid) {
@@ -76,11 +81,22 @@ class EmbeddedPythonBuilder {
 
   async downloadPythonRuntime() {
     const arch = process.arch === 'arm64' ? 'aarch64' : 'x86_64';
-    const filename = `cpython-${this.pythonVersion}+${this.buildDate}-${arch}-apple-darwin-install_only.tar.gz`;
+    
+    // 根据平台选择正确的标识符
+    let platformId;
+    if (process.platform === 'win32') {
+      platformId = 'pc-windows-msvc-shared';
+    } else if (process.platform === 'darwin') {
+      platformId = 'apple-darwin-install_only';
+    } else {
+      platformId = 'unknown-linux-gnu';
+    }
+    
+    const filename = `cpython-${this.pythonVersion}+${this.buildDate}-${arch}-${platformId}.tar.gz`;
     const url = `https://github.com/indygreg/python-build-standalone/releases/download/${this.buildDate}/${filename}`;
     const tarPath = path.join(this.pythonDir, 'python.tar.gz');
 
-    console.log(`📥 下载Python运行时 (${arch})...`);
+    console.log(`📥 下载Python运行时 (${arch}, ${process.platform})...`);
     console.log(`URL: ${url}`);
 
     await this.downloadFile(url, tarPath);
@@ -146,8 +162,15 @@ class EmbeddedPythonBuilder {
   }
 
   async installDependencies() {
-    const pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
-    const sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+    // 根据平台选择正确的Python路径
+    let pythonPath, sitePackagesPath;
+    if (process.platform === 'win32') {
+      pythonPath = path.join(this.pythonDir, 'python.exe');
+      sitePackagesPath = path.join(this.pythonDir, 'Lib', 'site-packages');
+    } else {
+      pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+      sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+    }
 
     console.log('📦 安装Python依赖...');
 
@@ -253,7 +276,12 @@ class EmbeddedPythonBuilder {
     console.log('🔍 验证依赖安装...');
     
     const criticalDeps = ['numpy', 'torch', 'librosa', 'funasr'];
-    const sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+    let sitePackagesPath;
+    if (process.platform === 'win32') {
+      sitePackagesPath = path.join(this.pythonDir, 'Lib', 'site-packages');
+    } else {
+      sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+    }
     
     for (const dep of criticalDeps) {
       try {
@@ -301,7 +329,12 @@ class EmbeddedPythonBuilder {
       
       // 检查关键依赖是否可用
       const criticalDeps = ['numpy', 'torch', 'librosa', 'funasr'];
-      const sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+      let sitePackagesPath;
+      if (process.platform === 'win32') {
+        sitePackagesPath = path.join(this.pythonDir, 'Lib', 'site-packages');
+      } else {
+        sitePackagesPath = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+      }
       
       // 构建环境变量
       const verifyEnv = {
@@ -392,7 +425,13 @@ class EmbeddedPythonBuilder {
   }
 
   async getEmbeddedPythonInfo() {
-    const pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+    // 根据平台选择正确的Python路径
+    let pythonPath;
+    if (process.platform === 'win32') {
+      pythonPath = path.join(this.pythonDir, 'python.exe');
+    } else {
+      pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+    }
     
     if (!fs.existsSync(pythonPath)) {
       return null;

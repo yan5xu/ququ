@@ -603,17 +603,47 @@ class FunASRManager {
       const pythonEnv = this.buildPythonEnvironment();
 
       return new Promise((resolve) => {
-        this.logger.info && this.logger.info('启动FunASR Python进程', {
-          command: pythonCmd,
-          args: [serverPath],
-          env: pythonEnv
-        });
-
-        this.serverProcess = spawn(pythonCmd, [serverPath], {
-          stdio: ["pipe", "pipe", "pipe"],
-          windowsHide: true,
-          env: pythonEnv // 使用完整的Python环境变量
-        });
+        // 判断是否使用 uv 环境
+        const projectRoot = path.join(__dirname, "..", "..");
+        const isUvEnvironment = pythonCmd.includes(path.join(projectRoot, ".venv")) || pythonCmd === "python3" || pythonCmd === "python";
+        
+        let serverProcess;
+        let command, args;
+        
+        if (isUvEnvironment && fs.existsSync(path.join(projectRoot, "pyproject.toml"))) {
+          // 使用 uv run 执行
+          command = "uv";
+          args = ["run", "python", serverPath];
+          this.logger.info && this.logger.info('使用 uv run 启动 FunASR 服务器', {
+            command,
+            args,
+            cwd: projectRoot
+          });
+          
+          serverProcess = spawn(command, args, {
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
+            cwd: projectRoot,
+            env: pythonEnv
+          });
+        } else {
+          // 使用常规方式
+          command = pythonCmd;
+          args = [serverPath];
+          this.logger.info && this.logger.info('启动FunASR Python进程', {
+            command,
+            args,
+            env: pythonEnv
+          });
+          
+          serverProcess = spawn(command, args, {
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
+            env: pythonEnv
+          });
+        }
+        
+        this.serverProcess = serverProcess;
 
         let initResponseReceived = false;
 
@@ -804,6 +834,8 @@ class FunASRManager {
       path.join(projectRoot, ".venv", "bin", "python3.11"),
       path.join(projectRoot, ".venv", "bin", "python3"),
       path.join(projectRoot, ".venv", "bin", "python"),
+      path.join(projectRoot, ".venv", "Scripts", "python.exe"), // Windows uv 环境
+      path.join(projectRoot, ".venv", "Scripts", "python3.exe"), // Windows uv 环境
       // 然后尝试系统路径
       "python3.11",
       "python3",
@@ -903,14 +935,31 @@ class FunASRManager {
 
       const result = await new Promise((resolve) => {
         // 确保使用正确的Python环境
-        const pythonEnv = this.buildPythonEnvironment();
+        let pythonEnv = this.buildPythonEnvironment();
         
-        const checkProcess = spawn(pythonCmd, [
-          "-c",
-          'import funasr; print("OK")',
-        ], {
-          env: pythonEnv
-        });
+        // 如果使用的是 uv 环境，则使用 uv run
+        const projectRoot = path.join(__dirname, "..", "..");
+        const isUvEnvironment = pythonCmd.includes(path.join(projectRoot, ".venv")) || pythonCmd === "python3" || pythonCmd === "python";
+        
+        let checkProcess;
+        if (isUvEnvironment && fs.existsSync(path.join(projectRoot, "pyproject.toml"))) {
+          // 使用 uv run 执行
+          this.logger.info && this.logger.info('使用 uv run 执行 FunASR 检查');
+          checkProcess = spawn("uv", [
+            "run", "python", "-c", 'import funasr; print("OK")'
+          ], {
+            cwd: projectRoot,
+            env: pythonEnv
+          });
+        } else {
+          // 使用常规方式
+          checkProcess = spawn(pythonCmd, [
+            "-c",
+            'import funasr; print("OK")',
+          ], {
+            env: pythonEnv
+          });
+        }
 
         let output = "";
         let errorOutput = "";
