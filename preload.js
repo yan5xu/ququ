@@ -62,17 +62,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSavedHotkey: () => ipcRenderer.invoke("get-saved-hotkey"),
   saveHotkey: (hotkey) => ipcRenderer.invoke("save-hotkey", hotkey),
   
-  // F2热键管理
-  registerF2Hotkey: () => ipcRenderer.invoke("register-f2-hotkey"),
-  unregisterF2Hotkey: () => ipcRenderer.invoke("unregister-f2-hotkey"),
+  // 热键管理
   setRecordingState: (isRecording) => ipcRenderer.invoke("set-recording-state", isRecording),
   getRecordingState: () => ipcRenderer.invoke("get-recording-state"),
-  
-  // F2双击事件监听
-  onF2DoubleClick: (callback) => {
-    ipcRenderer.on("f2-double-click", callback);
-    return () => ipcRenderer.removeListener("f2-double-click", callback);
-  },
   
   // 热键触发事件监听
   onHotkeyTriggered: (callback) => {

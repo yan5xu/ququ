@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, RotateCcw } from 'lucide-react';
+import React, { useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 
 const HotkeySettings = ({ onSave, initialHotkey = 'CommandOrControl+Shift+Space' }) => {
   const [hotkey, setHotkey] = useState(initialHotkey);
@@ -77,62 +77,41 @@ const HotkeySettings = ({ onSave, initialHotkey = 'CommandOrControl+Shift+Space'
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-      <div className="mb-4">
-        <h3 className="text-md font-semibold text-gray-900 dark:text-gray-100 chinese-title">
-          热键设置
-        </h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-          设置用于语音转文字的全局快捷键
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        {/* 热键录入 */}
-        <div className="flex items-center space-x-3">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">
-            热键:
-          </label>
-          <div 
-            className={`flex-1 px-3 py-2 text-sm rounded-lg border focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent cursor-pointer ${
-              isRecording 
-                ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' 
-                : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600'
-            }`}
-            onClick={startRecording}
-            onKeyDown={isRecording ? handleKeyDown : undefined}
-            tabIndex={0}
-            style={{ outline: 'none' }}
-          >
-            <div className="font-mono">
-              {isRecording ? '按组合键...' : hotkey}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div 
+          className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+            isRecording 
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600' 
+              : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800'
+          }`}
+          onClick={startRecording}
+          onKeyDown={isRecording ? handleKeyDown : undefined}
+          tabIndex={0}
+          style={{ outline: 'none' }}
+        >
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">热键设置</div>
+          <div className="flex items-center justify-between">
+            <div className="font-mono text-lg text-gray-900 dark:text-gray-100">
+              {isRecording ? (
+                <span className="text-blue-600 dark:text-blue-400">按组合键...</span>
+              ) : (
+                hotkey
+              )}
+            </div>
+            <div className="text-gray-400 dark:text-gray-500 text-sm">
+              {isRecording ? '录制中' : '点击修改'}
             </div>
           </div>
         </div>
-
-        {/* 操作按钮 */}
-        <div className="flex items-center space-x-3 pt-2">
-          <div className="flex space-x-2">
-            <button
-              onClick={startRecording}
-              className={`flex items-center space-x-1 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                isRecording 
-                  ? 'bg-gray-500 hover:bg-gray-600 text-white' 
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>{isRecording ? '正在录制...' : '修改'}</span>
-            </button>
-            
-            <button
-              onClick={resetToDefault}
-              className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>默认</span>
-            </button>
-          </div>
+        
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={resetToDefault}
+            className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 rounded-lg transition-colors"
+          >
+            重置
+          </button>
         </div>
       </div>
     </div>

@@ -257,9 +257,6 @@ const SettingsPage = () => {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 chinese-title">
                   热键设置
                 </h2>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                  设置用于语音转文字的全局快捷键
-                </p>
               </div>
               
               <HotkeySettings

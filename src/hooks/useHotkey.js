@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * 热键管理Hook
- * 处理全局快捷键功能，包括F2双击功能
+ * 处理全局快捷键功能
  */
 export const useHotkey = () => {
   const [hotkey, setHotkey] = useState('CommandOrControl+Shift+Space');
@@ -29,7 +29,7 @@ export const useHotkey = () => {
     getCurrentHotkey();
   }, []);
 
-  // 移除F2双击相关的复杂逻辑，专注于传统热键
+  
 
   // 注册传统热键
   const registerHotkey = async (newHotkey) => {
@@ -94,7 +94,7 @@ export const useHotkey = () => {
       .replace('Shift', '⇧')
       .replace('Alt', '⌥')
       .replace('Space', '空格')
-      .replace('F2', 'F2')
+      
       .replace('+', ' + ');
   };
 
