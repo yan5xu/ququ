@@ -1,3 +1,8 @@
+ignoredBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild
+  - ffmpeg-static
+
 onlyBuiltDependencies:
   - better-sqlite3
   - electron

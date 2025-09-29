@@ -5,7 +5,12 @@ const { spawn } = require('child_process');
 class EmbeddedPythonTester {
   constructor() {
     this.pythonDir = path.join(__dirname, '..', 'python');
-    this.pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+    // 根据平台选择正确的Python路径
+    if (process.platform === 'win32') {
+      this.pythonPath = path.join(this.pythonDir, 'python.exe');
+    } else {
+      this.pythonPath = path.join(this.pythonDir, 'bin', 'python3.11');
+    }
   }
 
   async runTests() {
@@ -139,14 +144,20 @@ class EmbeddedPythonTester {
   async runPythonCommand(args) {
     return new Promise((resolve, reject) => {
       // 设置隔离环境变量
-      const env = {
+      let env = {
         ...process.env,
         PYTHONHOME: this.pythonDir,
-        PYTHONPATH: path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages'),
         PYTHONDONTWRITEBYTECODE: '1',
         PYTHONIOENCODING: 'utf-8',
         PYTHONUNBUFFERED: '1'
       };
+      
+      // 根据平台设置正确的PYTHONPATH
+      if (process.platform === 'win32') {
+        env.PYTHONPATH = path.join(this.pythonDir, 'Lib', 'site-packages');
+      } else {
+        env.PYTHONPATH = path.join(this.pythonDir, 'lib', 'python3.11', 'site-packages');
+      }
       
       // 清除可能干扰的环境变量
       delete env.PYTHONUSERBASE;

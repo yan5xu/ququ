@@ -25,7 +25,8 @@
     "prebuild:linux": "npm run prepare:python:embedded && npm run build:renderer",
     "build:linux": "electron-builder --linux",
     "pack": "npm run build:renderer && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
-    "dist": "npm run prepare:python:embedded && npm run build:renderer && electron-builder",
+    "dist": "npm run prepare:python:uv && npm run build:renderer && electron-builder",
+    "dist:no-python": "npm run build:renderer && electron-builder",
     "lint": "cd src && eslint .",
     "preview": "cd src && vite preview",
     "clean": "node cleanup.js && rm -rf python"
@@ -58,6 +59,7 @@
     "cross-env": "^10.0.0",
     "electron": "36.5.0",
     "electron-builder": "^24.6.4",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
@@ -113,6 +115,8 @@
     "directories": {
       "output": "dist"
     },
+    "nodeGypRebuild": false,
+    "npmRebuild": false,
     "files": [
       "main.js",
       "preload.js",
@@ -150,7 +154,9 @@
       }
     },
     "win": {
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
     },
     "linux": {
       "icon": "assets/icon.png",
