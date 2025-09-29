@@ -232,6 +232,26 @@ uv sync  # 会自动下载 Python 3.11
     4.  将您的分支推送到远程 (`git push origin feature/your-amazing-feature`)
     5.  创建一个 Pull Request
 
+## 💬 交流与社区 (Communication & Community)
+
+「蛐蛐」是一个由社区驱动的开源项目，我们相信开放的交流能激发最好的创意。你的每一个想法、每一次反馈都对项目至关重要。
+
+我们诚挚地邀请你加入官方微信交流群，在这里你可以：
+
+*   🚀 **获取一手资讯**：第一时间了解项目更新、新功能预告和开发路线图。
+*   💬 **直接与开发者对话**：遇到安装难题？有绝妙的功能点子？在群里可以直接 @ 作者和核心贡献者。
+*   💡 **分享与学习**：交流你的 AI 指令 (Prompt) 和自动化工作流，看看别人是怎么把「蛐蛐」玩出花的。
+*   🤝 **参与项目共建**：从一个想法的提出，到一次代码的提交 (Pull Request)，社区是你最好的起点。
+
+<div align="center">
+
+| 微信扫码，加入官方交流群 |
+| :----------------------------------------------------------: |
+| <img src="assets/wechat-community-qrcode.png" width="200" alt="QuQu Official WeChat Group" /> <br> *QuQu Official WeChat Group* |
+| <p style="font-size:12px; color: #888;">如果二维码过期或无法加入，请在 <a href="https://github.com/yan5xu/ququ/issues">Issues</a> 中提一个 Issue 提醒我们，谢谢！</p> |
+
+</div>
+
 ## 🙏 致谢
 
 本项目的诞生离不开以下优秀项目的启发和支持：
