@@ -184,14 +184,61 @@ class FunASRManager {
     return env;
   }
 
+  findDamoRoot(startDir) {
+    if (!fs.existsSync(startDir)) return null;
+
+    const entries = fs.readdirSync(startDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const fullPath = path.join(startDir, entry.name);
+        if (entry.name === 'damo') {
+          // 检查是否包含至少一个目标模型子目录
+          const models = fs.readdirSync(fullPath);
+          const hasExpectedModel = models.some(m =>
+            m.startsWith('speech_paraformer-') ||
+            m.startsWith('speech_fsmn_vad-') ||
+            m.startsWith('punc_ct-transformer-')
+          );
+          if (hasExpectedModel) {
+            return fullPath;
+          }
+        }
+        // 递归继续查找
+        const found = findDamoRoot(fullPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
   /**
    * 获取模型缓存路径
    */
   getModelCachePath() {
-    // 对于 macos 系统，有些人使用 MODELSCOPE_CACHE 更改了 modelscope 下载默认路径,这里需要用 MODELSCOPE_CACHE 环境变量兜底
-    const customCachePath = process.env.MODELSCOPE_CACHE || require('os').homedir() + '/.cache/modelscope';
-    return path.join(customCachePath, "hub", "models", "damo");
+    const baseCachePath =
+      process.env.MODELSCOPE_CACHE || path.join(os.homedir(), '.cache', 'modelscope');
+
+    // 可能的候选路径
+    const candidates = [
+      path.join(baseCachePath, 'damo'),
+      path.join(baseCachePath, 'hub', 'damo'),
+      path.join(baseCachePath, 'models', 'damo'),
+    ];
+
+    // 先检查常见路径
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    // 如果没找到，则递归搜索
+    const found = findDamoRoot(baseCachePath);
+    if (found) return found;
+
+    throw new Error(`未找到有效的 damo 模型目录，请检查 MODELSCOPE_CACHE 或模型安装路径`);
   }
+
 
   async checkModelFiles() {
     /**
@@ -585,7 +632,6 @@ class FunASRManager {
 
       const pythonCmd = await this.findPythonExecutable();
       const serverPath = this.getFunASRServerPath();
-      
       this.logger.info && this.logger.info('FunASR服务器配置', {
         pythonCmd,
         serverPath,
@@ -609,12 +655,22 @@ class FunASRManager {
           args: [serverPath],
           env: pythonEnv
         });
+        const cachePath = this.getModelCachePath();
+        // this.serverProcess = spawn(pythonCmd, [serverPath], {
+        //   stdio: ["pipe", "pipe", "pipe"],
+        //   windowsHide: true,
+        //   env: pythonEnv // 使用完整的Python环境变量
+        // });
 
-        this.serverProcess = spawn(pythonCmd, [serverPath], {
-          stdio: ["pipe", "pipe", "pipe"],
-          windowsHide: true,
-          env: pythonEnv // 使用完整的Python环境变量
-        });
+        this.serverProcess = spawn(
+          pythonCmd,
+          [serverPath, "--damo-root", cachePath],   // <== 这里加上参数
+          {
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
+            env: pythonEnv // 保持你原来的 Python 环境
+          }
+        );
 
         let initResponseReceived = false;
 

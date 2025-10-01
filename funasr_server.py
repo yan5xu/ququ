@@ -13,6 +13,8 @@ import traceback
 import signal
 import contextlib
 import io
+import argparse
+import glob
 from pathlib import Path
 
 # 设置日志
@@ -64,20 +66,20 @@ def suppress_stdout():
 
 
 class FunASRServer:
-    def __init__(self):
+    def __init__(self, damo_root=None):
         self.asr_model = None
         self.vad_model = None
         self.punc_model = None
         self.initialized = False
         self.running = True
-        self.transcription_count = 0  # 转录计数器
-        self.total_audio_duration = 0.0  # 总音频时长
+        self.transcription_count = 0
+        self.total_audio_duration = 0.0
 
-        # 设置信号处理
+        # 外部传入的 damo 根目录（例如 /Volumes/APFS/AI/models/damo）
+        self.damo_root = damo_root or os.environ.get("DAMO_ROOT")
+
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
-
-        # 生产环境优化：设置运行时参数
         self._setup_runtime_environment()
 
     def _setup_runtime_environment(self):
@@ -413,28 +415,59 @@ class FunASRServer:
         """运行服务器主循环"""
         logger.info("FunASR服务器启动")
 
-        # 检查模型文件是否存在，如果不存在则不初始化
-        import os
-        home_dir = os.path.expanduser("~")
-        cache_path = os.path.join(home_dir, ".cache", "modelscope", "hub", "models", "damo")
-        
-        models_exist = all([
-            os.path.exists(os.path.join(cache_path, "speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch", "model.pt")),
-            os.path.exists(os.path.join(cache_path, "speech_fsmn_vad_zh-cn-16k-common-pytorch", "model.pt")),
-            os.path.exists(os.path.join(cache_path, "punc_ct-transformer_zh-cn-common-vocab272727-pytorch", "model.pt"))
-        ])
-        
-        if models_exist:
+        # 解析 damo 根目录
+        def _default_damo_root():
+            # 允许通过 MODELSCOPE_CACHE 指定根；常见是 ~/.cache/modelscope/hub/damo
+            root = os.environ.get("MODELSCOPE_CACHE")
+            if root:
+                # 兼容两种布局：<cache>/damo 或 <cache>/hub/damo
+                if os.path.isdir(os.path.join(root, "damo")):
+                    return os.path.join(root, "damo")
+                if os.path.isdir(os.path.join(root, "hub", "damo")):
+                    return os.path.join(root, "hub", "damo")
+                # 像 Node 一样自定义到 /Volumes/APFS/AI/models/damo，就直接传入 --damo-root
+            # 默认回到用户主目录的 modelscope/hub/damo
+            home_dir = os.path.expanduser("~")
+            return os.path.join(home_dir, ".cache", "modelscope", "hub", "damo")
+
+        cache_path = self.damo_root if self.damo_root else _default_damo_root()
+        logger.info(f"使用的模型根目录(damo root): {cache_path}")
+
+        repos = [
+            "speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+            "speech_fsmn_vad_zh-cn-16k-common-pytorch",
+            "punc_ct-transformer_zh-cn-common-vocab272727-pytorch",
+        ]
+
+        def _repo_ready(repo_dir):
+            # 目录存在且包含任意常见权重/配置文件即认为已就绪
+            if not os.path.isdir(repo_dir):
+                return False
+            patterns = [
+                "model.pt", "pytorch_model.bin", "*.onnx",
+                "config.json", "configuration.json", "model.yaml", "vocab*"
+            ]
+            for pat in patterns:
+                if glob.glob(os.path.join(repo_dir, pat)):
+                    return True
+            return False
+
+        missing = []
+        for r in repos:
+            rd = os.path.join(cache_path, r)
+            if not _repo_ready(rd):
+                missing.append(r)
+
+        if not missing:
             logger.info("模型文件存在，开始初始化")
             init_result = self.initialize()
         else:
-            logger.info("模型文件不存在，跳过初始化")
+            logger.info(f"模型文件不存在或不完整：{', '.join(missing)}，跳过初始化")
             init_result = {
                 "success": False,
                 "error": "模型文件未下载，请先下载模型",
                 "type": "models_not_downloaded"
             }
-        
         print(json.dumps(init_result, ensure_ascii=False))
         sys.stdout.flush()
 
@@ -497,7 +530,11 @@ class FunASRServer:
 
         logger.info("FunASR服务器退出")
 
-
 if __name__ == "__main__":
-    server = FunASRServer()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--damo-root", type=str, default=None,
+                        help="damo 模型根目录，例如 /Volumes/APFS/AI/models/damo")
+    args = parser.parse_args()
+
+    server = FunASRServer(damo_root=args.damo_root)
     server.run()

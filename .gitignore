@@ -4,6 +4,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+yarn.lock*
+
 
 # Production builds
 dist/
@@ -23,6 +25,7 @@ out/
 ._*
 .Spotlight-V100
 .Trashes
+.gitignore
 ehthumbs.db
 Thumbs.db
 
@@ -151,3 +154,4 @@ temp/
 .gyprc
 
 python
+.gitignore
