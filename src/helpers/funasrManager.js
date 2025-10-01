@@ -184,30 +184,46 @@ class FunASRManager {
     return env;
   }
 
-  findDamoRoot(startDir) {
-    if (!fs.existsSync(startDir)) return null;
-
-    const entries = fs.readdirSync(startDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const fullPath = path.join(startDir, entry.name);
-        if (entry.name === 'damo') {
-          // 检查是否包含至少一个目标模型子目录
-          const models = fs.readdirSync(fullPath);
-          const hasExpectedModel = models.some(m =>
-            m.startsWith('speech_paraformer-') ||
-            m.startsWith('speech_fsmn_vad-') ||
-            m.startsWith('punc_ct-transformer-')
-          );
-          if (hasExpectedModel) {
-            return fullPath;
-          }
-        }
-        // 递归继续查找
-        const found = findDamoRoot(fullPath);
-        if (found) return found;
-      }
+  findDamoRoot(startDir, depth = 0, maxDepth = 5) {
+    // 添加深度限制，避免在深层目录结构中搜索过久
+    if (depth > maxDepth || !fs.existsSync(startDir)) {
+      return null;
     }
+
+    try {
+      const entries = fs.readdirSync(startDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const fullPath = path.join(startDir, entry.name);
+          
+          if (entry.name === 'damo') {
+            // 检查是否包含至少一个目标模型子目录
+            try {
+              const models = fs.readdirSync(fullPath);
+              const hasExpectedModel = models.some(m =>
+                m.startsWith('speech_paraformer-') ||
+                m.startsWith('speech_fsmn_vad-') ||
+                m.startsWith('punc_ct-transformer-')
+              );
+              if (hasExpectedModel) {
+                return fullPath;
+              }
+            } catch (error) {
+              // 忽略无法读取的目录
+              this.logger.debug && this.logger.debug('无法读取目录:', fullPath, error.message);
+            }
+          }
+          
+          // 递归继续查找 - 修复：添加 this 关键字
+          const found = this.findDamoRoot(fullPath, depth + 1, maxDepth);
+          if (found) return found;
+        }
+      }
+    } catch (error) {
+      // 处理权限错误或其他文件系统错误
+      this.logger.debug && this.logger.debug('搜索目录时出错:', startDir, error.message);
+    }
+    
     return null;
   }
 
@@ -218,23 +234,29 @@ class FunASRManager {
     const baseCachePath =
       process.env.MODELSCOPE_CACHE || path.join(os.homedir(), '.cache', 'modelscope');
 
-    // 可能的候选路径
+    // 可能的候选路径 - 添加 hub/models/damo 路径
     const candidates = [
       path.join(baseCachePath, 'damo'),
       path.join(baseCachePath, 'hub', 'damo'),
+      path.join(baseCachePath, 'hub', 'models', 'damo'),  // 新增：支持 hub/models/damo 结构
       path.join(baseCachePath, 'models', 'damo'),
     ];
 
     // 先检查常见路径
     for (const candidate of candidates) {
       if (fs.existsSync(candidate)) {
+        this.logger.info && this.logger.info('找到模型缓存路径:', candidate);
         return candidate;
       }
     }
 
-    // 如果没找到，则递归搜索
-    const found = findDamoRoot(baseCachePath);
-    if (found) return found;
+    // 如果没找到，则递归搜索 - 修复：添加 this 关键字
+    this.logger.info && this.logger.info('常见路径未找到，开始递归搜索:', baseCachePath);
+    const found = this.findDamoRoot(baseCachePath);
+    if (found) {
+      this.logger.info && this.logger.info('递归搜索找到模型路径:', found);
+      return found;
+    }
 
     throw new Error(`未找到有效的 damo 模型目录，请检查 MODELSCOPE_CACHE 或模型安装路径`);
   }

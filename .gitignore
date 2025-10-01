@@ -25,7 +25,6 @@ out/
 ._*
 .Spotlight-V100
 .Trashes
-.gitignore
 ehthumbs.db
 Thumbs.db
 
@@ -154,4 +153,3 @@ temp/
 .gyprc
 
 python
-.gitignore
