@@ -184,12 +184,13 @@ class FunASRManager {
     return env;
   }
 
+  /**
+   * 获取模型缓存路径
+   */
   getModelCachePath() {
-    /**
-     * 获取模型缓存路径
-     */
-    const homeDir = os.homedir();
-    return path.join(homeDir, ".cache", "modelscope", "hub", "models", "damo");
+    // 对于 macos 系统，有些人使用 MODELSCOPE_CACHE 更改了 modelscope 下载默认路径,这里需要用 MODELSCOPE_CACHE 环境变量兜底
+    const customCachePath = process.env.MODELSCOPE_CACHE || require('os').homedir() + '/.cache/modelscope';
+    return path.join(customCachePath, "hub", "models", "damo");
   }
 
   async checkModelFiles() {
