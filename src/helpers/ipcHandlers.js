@@ -10,8 +10,7 @@ class IPCHandlers {
     this.hotkeyManager = managers.hotkeyManager;
     this.logger = managers.logger; // 添加logger引用
     
-    // 跟踪F2热键注册状态
-    this.f2RegisteredSenders = new Set();
+    
     
     this.setupHandlers();
   }
@@ -314,10 +313,11 @@ class IPCHandlers {
         if (this.hotkeyManager) {
           const senderId = event.sender.id;
           
-          // 检查是否已经为这个发送者注册过热键
-          if (this.hotkeyRegisteredSenders.has(senderId)) {
-            this.logger.info(`发送者 ${senderId} 已注册过热键，跳过重复注册`);
-            return { success: true };
+          // 注销之前可能已注册的热键
+          const registeredHotkeys = this.hotkeyManager.getRegisteredHotkeys();
+          const mainHotkey = registeredHotkeys[0]; // 获取第一个注册的热键
+          if (mainHotkey) {
+            this.hotkeyManager.unregisterHotkey(mainHotkey);
           }
           
           const success = this.hotkeyManager.registerHotkey(hotkey, () => {
@@ -329,21 +329,12 @@ class IPCHandlers {
           });
           
           if (success) {
-            // 添加发送者到跟踪列表
-            this.hotkeyRegisteredSenders.add(senderId);
-            
-            // 监听窗口关闭事件，清理注册记录
-            event.sender.on('destroyed', () => {
-              this.hotkeyRegisteredSenders.delete(senderId);
-              this.logger.info(`清理发送者 ${senderId} 的热键注册记录`);
-            });
-            
             this.logger.info(`热键 ${hotkey} 注册成功，发送者: ${senderId}`);
+            return { success: true };
           } else {
             this.logger.error(`热键 ${hotkey} 注册失败`);
+            return { success: false };
           }
-          
-          return { success };
         }
         return { success: false, error: "热键管理器未初始化" };
       } catch (error) {
@@ -365,12 +356,19 @@ class IPCHandlers {
       }
     });
 
-    ipcMain.handle("get-current-hotkey", () => {
+    ipcMain.handle("get-current-hotkey", async () => {
       try {
         if (this.hotkeyManager) {
+          // 首先从数据库获取用户设置的热键
+          const savedHotkey = await this.databaseManager.getSetting('hotkey');
+          
+          if (savedHotkey) {
+            return savedHotkey;
+          }
+          
           const hotkeys = this.hotkeyManager.getRegisteredHotkeys();
-          // 返回第一个非F2的热键，或默认热键
-          const mainHotkey = hotkeys.find(key => key !== 'F2') || "CommandOrControl+Shift+Space";
+          // 返回第一个热键，或默认热键
+          const mainHotkey = hotkeys[0] || "CommandOrControl+Shift+Space";
           return mainHotkey;
         }
         return "CommandOrControl+Shift+Space";
@@ -380,85 +378,44 @@ class IPCHandlers {
       }
     });
 
-    // F2热键管理
-    ipcMain.handle("register-f2-hotkey", (event) => {
+    // 保存热键设置
+    ipcMain.handle("save-hotkey", async (event, hotkey) => {
       try {
-        const senderId = event.sender.id;
-        
-        // 检查是否已经为这个发送者注册过F2热键
-        if (this.f2RegisteredSenders.has(senderId)) {
-          this.logger.info(`F2热键已为发送者 ${senderId} 注册过，跳过重复注册`);
-          return { success: true };
-        }
-        
-        if (this.hotkeyManager) {
-          // 只有在没有任何发送者注册时才注册热键
-          const isFirstRegistration = this.f2RegisteredSenders.size === 0;
+        if (this.databaseManager) {
+          await this.databaseManager.setSetting('hotkey', hotkey);
           
-          if (isFirstRegistration) {
-            const success = this.hotkeyManager.registerF2DoubleClick((data) => {
-              // 发送F2双击事件到所有注册的渲染进程
-              this.logger.info("发送F2双击事件到渲染进程:", data);
-              this.f2RegisteredSenders.forEach(id => {
-                const window = require("electron").BrowserWindow.getAllWindows().find(w => w.webContents.id === id);
-                if (window && !window.isDestroyed()) {
-                  window.webContents.send("f2-double-click", data);
-                }
-              });
-            });
-            
-            if (!success) {
-              return { success: false, error: "F2热键注册失败" };
-            }
-          }
-          
-          // 添加发送者到跟踪列表
-          this.f2RegisteredSenders.add(senderId);
-          
-          // 监听窗口关闭事件，清理注册记录
-          event.sender.on('destroyed', () => {
-            this.f2RegisteredSenders.delete(senderId);
-            this.logger.info(`清理发送者 ${senderId} 的F2热键注册记录`);
-
-            // 如果没有发送者了，注销热键
-            if (this.f2RegisteredSenders.size === 0) {
-              this.hotkeyManager.unregisterHotkey('F2');
-              this.logger.info('所有发送者都已注销，注销F2热键');
+          // 广播热键变更事件
+          const windows = require("electron").BrowserWindow.getAllWindows();
+          windows.forEach(window => {
+            if (!window.isDestroyed()) {
+              window.webContents.send("hotkey-changed", { hotkey });
             }
           });
           
           return { success: true };
         }
-        return { success: false, error: "热键管理器未初始化" };
+        return { success: false, error: "数据库管理器未初始化" };
       } catch (error) {
-        this.logger.error("注册F2热键失败:", error);
+        this.logger.error("保存热键失败:", error);
         return { success: false, error: error.message };
       }
     });
 
-    ipcMain.handle("unregister-f2-hotkey", (event) => {
+    // 获取保存的热键
+    ipcMain.handle("get-saved-hotkey", async () => {
       try {
-        const senderId = event.sender.id;
-        
-        if (this.hotkeyManager && this.f2RegisteredSenders.has(senderId)) {
-          this.f2RegisteredSenders.delete(senderId);
-          
-          // 如果没有其他发送者注册F2热键，则注销热键
-          if (this.f2RegisteredSenders.size === 0) {
-            const success = this.hotkeyManager.unregisterHotkey('F2');
-            this.logger.info('所有发送者都已注销，注销F2热键');
-            return { success };
-          } else {
-            this.logger.info(`发送者 ${senderId} 已注销，但还有其他发送者注册了F2热键`);
-            return { success: true };
-          }
+        if (this.databaseManager) {
+          const savedHotkey = await this.databaseManager.getSetting('hotkey');
+          return savedHotkey || "CommandOrControl+Shift+Space";
         }
-        return { success: false, error: "热键管理器未初始化或未注册" };
+        return "CommandOrControl+Shift+Space";
       } catch (error) {
-        this.logger.error("注销F2热键失败:", error);
-        return { success: false, error: error.message };
+        this.logger.error("获取保存的热键失败:", error);
+        return "CommandOrControl+Shift+Space";
       }
     });
+
+    
 
     ipcMain.handle("set-recording-state", (event, isRecording) => {
       try {

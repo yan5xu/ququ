@@ -43,13 +43,7 @@ class EnvironmentManager {
 
   getAppConfig() {
     return {
-      debug: process.env.DEBUG === "true",
-      logLevel: process.env.LOG_LEVEL || "info",
-      language: process.env.LANGUAGE || "zh-CN",
-      theme: process.env.THEME || "auto",
-      windowAlwaysOnTop: process.env.WINDOW_ALWAYS_ON_TOP === "true",
-      startMinimized: process.env.START_MINIMIZED === "true",
-      globalHotkey: process.env.GLOBAL_HOTKEY || "CommandOrControl+Shift+Space",
+      globalHotkey: "CommandOrControl+Shift+Space", // 默认热键，实际使用会从数据库获取
     };
   }
 

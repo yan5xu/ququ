@@ -75,6 +75,56 @@ const VoiceWaveIndicator = ({ isListening }) => {
   );
 };
 
+// 音频播放工具函数
+const playSound = () => {
+  // 创建一个音调生成函数，用于录音开始和结束
+  const createBeep = (frequency = 1200, duration = 0.08, volume = 0.1) => {
+    try {
+      if (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
+        // 使用共享的音频上下文，如果不存在则创建
+        if (!sharedAudioContext) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          sharedAudioContext = new AudioContext();
+        }
+        
+        // 检查音频上下文状态，如果 suspended 需要恢复
+        if (sharedAudioContext.state === 'suspended') {
+          sharedAudioContext.resume();
+        }
+        
+        const oscillator = sharedAudioContext.createOscillator();
+        const gainNode = sharedAudioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(sharedAudioContext.destination);
+
+        oscillator.frequency.value = frequency;
+        oscillator.type = 'sine';
+
+        // 创建一个简单的音调下降效果，类似"叮"的声音
+        oscillator.frequency.setValueAtTime(frequency, sharedAudioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.5, sharedAudioContext.currentTime + duration);
+
+        gainNode.gain.setValueAtTime(volume, sharedAudioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, sharedAudioContext.currentTime + duration);
+
+        oscillator.start(sharedAudioContext.currentTime);
+        oscillator.stop(sharedAudioContext.currentTime + duration);
+      } else {
+        // 在不支持Web Audio API的环境中，尝试使用系统提示音
+        console.log('提示音: 录音状态切换');
+      }
+    } catch (error) {
+      console.error('播放提示音失败:', error);
+      // 如果Web Audio API不可用或失败，在控制台打印提示
+      console.log('提示音: 录音状态切换');
+    }
+  };
+
+  // 播放统一的提示音 - 更清脆的"叮"声
+  createBeep(1200, 0.08); // 1200Hz, 0.08秒，带有音调下降
+};
+
 // 增强的工具提示组件
 const Tooltip = ({ children, content, position = "top" }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -192,6 +242,9 @@ const TextDisplay = ({ originalText, processedText, isProcessing, onCopy, onExpo
     </div>
   );
 };
+
+// 创建一个共享的音频上下文实例
+let sharedAudioContext = null;
 
 export default function App() {
   // 检查URL参数来决定渲染哪个页面
@@ -433,14 +486,18 @@ export default function App() {
     }
 
     if (!isRecording && !isRecordingProcessing) {
+      // 播放提示音
+      playSound();
       startRecording();
     } else if (isRecording) {
+      // 播放提示音
+      playSound();
       stopRecording();
     }
-  }, [modelStatus, isRecording, isRecordingProcessing, startRecording, stopRecording]);
+  }, [modelStatus, isRecording, isRecordingProcessing, startRecording, stopRecording, playSound]);
 
   // 使用热键Hook，不再使用F2双击功能
-  const { hotkey, syncRecordingState, registerHotkey } = useHotkey();
+  const { hotkey, rawHotkey, syncRecordingState, registerHotkey } = useHotkey();
 
   // 注册传统热键监听 - 只在主窗口注册，避免重复
   useEffect(() => {
@@ -456,10 +513,11 @@ export default function App() {
 
     const initializeHotkey = async () => {
       try {
-        // 注册默认热键 CommandOrControl+Shift+Space
-        const success = await registerHotkey('CommandOrControl+Shift+Space');
+        // 获取并注册热键
+        const currentHotkey = await window.electronAPI.getCurrentHotkey();
+        const success = await registerHotkey(currentHotkey);
         if (success) {
-          console.log('主窗口热键注册成功');
+          console.log('主窗口热键注册成功:', currentHotkey);
         } else {
           console.error('主窗口热键注册失败');
         }
@@ -468,10 +526,8 @@ export default function App() {
       }
     };
 
-    if (registerHotkey) {
-      initializeHotkey();
-    }
-  }, [registerHotkey]);
+    initializeHotkey();
+  }, []); // 只在组件挂载时执行一次
 
   // 处理关闭窗口
   const handleClose = () => {
@@ -505,22 +561,41 @@ export default function App() {
       const unsubscribeHotkey = window.electronAPI.onHotkeyTriggered((event, data) => {
         console.log('收到热键触发事件:', data);
         console.log('当前录音状态:', isRecording, '处理状态:', isRecordingProcessing);
+        
+        // 播放统一的提示音
+        playSound();
+        
         toggleRecording();
       });
 
-      // 监听旧的toggle事件（保持兼容性）
-      const unsubscribeToggle = window.electronAPI.onToggleDictation(() => {
-        console.log('收到旧版toggle事件');
-        console.log('当前录音状态:', isRecording, '处理状态:', isRecordingProcessing);
-        toggleRecording();
+      // 监听热键变化事件
+      const unsubscribeHotkeyChanged = window.electronAPI.onHotkeyChanged(async (event, data) => {
+        console.log('收到热键变化事件，重新初始化热键:', data);
+        try {
+          // 重新注册热键
+          if (window.electronAPI) {
+            const newHotkey = data.hotkey;
+            if (newHotkey) {
+              // 注册新热键（内部会先注销之前的热键）
+              const success = await registerHotkey(newHotkey);
+              if (success) {
+                console.log('热键已更新:', newHotkey);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('更新热键失败:', error);
+        }
       });
+
+      
 
       return () => {
         if (unsubscribeHotkey) unsubscribeHotkey();
-        if (unsubscribeToggle) unsubscribeToggle();
+        if (unsubscribeHotkeyChanged) unsubscribeHotkeyChanged();
       };
     }
-  }, [toggleRecording, isRecording, isRecordingProcessing]);
+  }, [toggleRecording, isRecording, isRecordingProcessing, registerHotkey]);
 
   // 同步录音状态到热键管理器
   useEffect(() => {
@@ -539,6 +614,20 @@ export default function App() {
 
     document.addEventListener("keydown", handleKeyPress);
     return () => document.removeEventListener("keydown", handleKeyPress);
+  }, []);
+
+  // 组件卸载时清理音频上下文
+  useEffect(() => {
+    return () => {
+      if (sharedAudioContext && sharedAudioContext.close) {
+        sharedAudioContext.close().then(() => {
+          console.log('音频上下文已关闭');
+        }).catch((error) => {
+          console.error('关闭音频上下文时出错:', error);
+        });
+        sharedAudioContext = null;
+      }
+    };
   }, []);
 
   // 错误处理
