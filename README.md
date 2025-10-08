@@ -225,12 +225,7 @@ uv sync  # 会自动下载 Python 3.11
 
 - 🤔 **提建议**: 对产品有任何想法？欢迎到 [Issues](https://github.com/yan5xu/ququ/issues) 页面提出。
 - 🐛 **报Bug**: 发现程序出错了？请毫不犹豫地告诉我们。
-- 💻 **贡献代码**: 如果您想添加新功能或修复Bug，请参考以下步骤：
-    1.  Fork 本项目
-    2.  创建您的特性分支 (`git checkout -b feature/your-amazing-feature`)
-    3.  提交您的更改 (`git commit -m 'feat: Add some amazing feature'`)
-    4.  将您的分支推送到远程 (`git push origin feature/your-amazing-feature`)
-    5.  创建一个 Pull Request
+- 💻 **贡献代码**: 如果您想添加新功能或修复Bug，请参考这里 [贡献指南](https://github.com/yan5xu/ququ/blob/main/CONTRIBUTING.md)
 
 ## 💬 交流与社区 (Communication & Community)
 
